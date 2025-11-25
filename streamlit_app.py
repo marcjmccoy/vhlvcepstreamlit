@@ -3,7 +3,7 @@ import re
 from vhl_pvs1 import classify_vhl_pvs1  # Import PVS1 classifier
 from vhl_ps1 import classify_vhl_ps1    # Import PS1 classifier
 
-st.title("VHL VCEP Variant Classifer (v1.0 TEST) 🧬")
+st.title("VHL/VCEP Classifer (v1.0 TEST) 🧬")
 
 st.markdown(
     """
