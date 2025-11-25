@@ -7,8 +7,9 @@ st.title("VHL/VCEP Classifer (v1.0 TEST) 🧬")
 
 st.markdown(
     """
-    Enter a variant in HGVS (cDNA) notation to predict PVS1 and PS1 strength in accordance with VHL VCEP guidelines (The rest of the criteria are to come soon! This is a test!).
-    Please note strength returns "null" if the criteria is not relevant. Context is meant to orient you as to why the strength label was applied.
+    Enter a variant in HGVS (cDNA) notation to predict PVS1 and PS1 strength in accordance with VHL VCEP guidelines (Classifers for remaining criteria will be uploading in the coming days! This is a test!).
+    Please note strength returns "null" if the criteria is not relevant. Context is meant to orient you as to why the strength label was applied. For your reference, the original
+    criteria are [here](https://cspec.genome.network/cspec/ui/svi/doc/GN078#pmid_35709961).
 
     Some suggested variants to try entering:
 
