@@ -3,16 +3,36 @@ import re
 from vhl_pvs1 import classify_vhl_pvs1  # Import PVS1 classifier
 from vhl_ps1 import classify_vhl_ps1    # Import PS1 classifier
 
-st.title("VHL Variant Classifiers")
+st.title("VHL VCEP Variant Classifer")
 
 st.markdown(
     """
-    Enter a variant in HGVS (cDNA) notation to predict PVS1 and PS1 strength and context in accordance with VHL VCEP guidelines (the rest of the criteria are to come soon!).
+    Enter a variant in HGVS (cDNA) notation to predict PVS1 and PS1 strength in accordance with VHL VCEP guidelines (The rest of the criteria are to come soon! This is a test!).
+    Please note strength returns "null" if the criteria is not relevant. Context is meant to orient you as to why the strength label was applied.
+
+    Some suggested variants to try entering:
+    NM_000551.4(VHL):c.263+1G>A
+    NM_000551.4(VHL):c.340-1G>A
+    NM_000551.4(VHL):c.119_340del
+    NM_000551.4(VHL):c.123+5G>A
+    NM_000551.4(VHL):c.154-7A>G
+    NM_000551.4(VHL):c.477del (p.Glu160fs)
+    NM_000551.4(VHL):c.422dup (p.Asn141fs)
+    NM_000551.4(VHL):c.408del (p.Phe136fs)
+    NM_000551.4(VHL):c.120_122del (p.Val41del)
+    NM_000551.4(VHL):c.190_195dup (p.Lys64_Leu65dup)
+    NM_000551.4(VHL):c.263G>A (p.Trp88Ter)
+    NM_000551.4(VHL):c.208G>T (p.Glu70Ter)
+    NM_000551.4(VHL):c.586A>T (p.Lys196Ter)
+    NM_000551.4(VHL):c.583C>T (p.Gln195Ter)
+    NM_000551.4(VHL):c.1A>T (p.Met1Leu)
+    NM_000551.4(VHL):c.160A>T (p.Met54Leu)
+    NM_000551.4(VHL):c.150G>A (p.Pro50=)
     """
 )
 
 hgvs_input = st.text_input(
-    "use HGVS c. Notation ... example: NM_000551.4(VHL):c.191G>C (p.Arg64Pro)",
+    "use HGVS c. Notation in alignment with the above examples",
     ""
 )
 
