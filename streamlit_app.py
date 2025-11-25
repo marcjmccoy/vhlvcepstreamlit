@@ -1,7 +1,6 @@
 import streamlit as st
 import re
 from vhl_pvs1 import classify_vhl_pvs1  # Import PVS1 classifier
-from vhl_ps1 import classify_vhl_ps1    # Import PS1 classifier
 
 st.title("VHL Variant Classifiers")
 
@@ -32,10 +31,7 @@ if hgvs_input:
         duplication_type=duplication_type if duplication_type not in (None, "None") else None,
         initiation_codon=initiation_codon if initiation_codon not in (None, "None") else None
     )
-    ps1_result = classify_vhl_ps1(hgvs_input)  # Adjust arguments if needed for your PS1 classifier
 
     st.header("Classification Results")
     st.subheader("PVS1 Result")
     st.write(pvs1_result)
-    st.subheader("PS1 Result")
-    st.write(ps1_result)
