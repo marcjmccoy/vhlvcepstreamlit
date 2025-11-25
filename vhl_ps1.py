@@ -1,5 +1,5 @@
 ############################# PS1 ###################################################
-def classify_vhl_PS1(test_variant):
+def classify_vhl_ps1(test_variant):
     """
     Assess PS1 for VHL using ACMG/AMP VCEP rules.
     Returns: dict with 'strength' (str or None), 'context' (str)
