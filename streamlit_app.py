@@ -1,5 +1,6 @@
 import streamlit as st
-# Optionally, import from vhl_pvs1 import classify_vhl_pvs1 if using external file, otherwise paste all your code above in this file.
+import re
+from vhl_pvs1 import classify_vhl_pvs1  # Import classifier function
 
 st.title("VHL PVS1 Classifier")
 
