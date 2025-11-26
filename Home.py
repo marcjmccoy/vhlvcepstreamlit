@@ -9,17 +9,13 @@ from vhl_ps2 import classify_vhl_ps2
 st.set_page_config(page_title="VHL/VCEP Classifier", page_icon="🧬", layout="wide")
 
 # ---------- Sidebar (About only) ----------
-st.sidebar.title("VHL VCEP App")
-
 st.sidebar.markdown(
     """
 ### About VHL VCEP
 
-The **VHL Variant Curation Expert Panel (VCEP)** is part of ClinGen’s effort to provide expert-level clinical validity for variants in the *VHL* gene.  
-The committee is chaired by **Dr. Raymond Kim**, whose work at Princess Margaret Cancer Centre, SickKids Hospital, and the Early Cancer Detection Program focuses on hereditary cancer genetics and variant interpretation. The panel has developed a disease-specific annotation protocol using Hypothes.is to enable community curation of VHL variants and accelerate resolution of variants of uncertain significance.
+The **VHL Variant Curation Expert Panel (VCEP)** is part of ClinGen’s effort to provide expert-level clinical validity for variants in the *VHL* gene. The committee is chaired by **Dr. Raymond Kim**, whose work at Princess Margaret Cancer Centre, SickKids Hospital, and the Early Cancer Detection Program focuses on hereditary cancer genetics and variant interpretation. The panel has developed a disease-specific annotation protocol using Hypothes.is to enable community curation of VHL variants and accelerate resolution of variants of uncertain significance.
 
-📄 Read more:  
-[Developing a disease-specific annotation protocol for VHL gene curation using Hypothes.is](https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/)
+📄 Read more [here:](Developing a disease-specific annotation protocol for VHL gene curation using Hypothes.is](https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/)
 """
 )
 
@@ -171,7 +167,7 @@ example_variants = pd.DataFrame(
 def blue_table_style(df):
     return df.style.set_properties(
         **{
-            "background-color": "#e8f2ff",
+            "background-color": "#ffffff",
             "border-color": "#a3b8e6",
         }
     )
