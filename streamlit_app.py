@@ -1,9 +1,11 @@
 import streamlit as st
 import re
+import pandas as pd
 from vhl_pvs1 import classify_vhl_pvs1
 from vhl_ps1 import classify_vhl_ps1
 from vhl_ps2 import classify_vhl_ps2
 
+# Configure app ONCE, in main entry file
 st.set_page_config(page_title="VHL/VCEP Classifier", page_icon="🧬", layout="wide")
 
 # ---------- Sidebar (About only) ----------
@@ -14,9 +16,7 @@ st.sidebar.markdown(
 ### About VHL VCEP
 
 The **VHL Variant Curation Expert Panel (VCEP)** is part of ClinGen’s effort to provide expert-level clinical validity for variants in the *VHL* gene.  
-The committee is chaired by **Dr. Raymond H. Kim**, whose work at Princess Margaret Cancer Centre, SickKids Hospital, and the Early Cancer Detection Program focuses on hereditary cancer genetics and variant interpretation.
-
-The panel has developed a disease-specific annotation protocol using Hypothes.is to enable community curation of VHL variants and accelerate resolution of variants of uncertain significance.
+The committee is chaired by **Dr. Raymond Kim**, whose work at Princess Margaret Cancer Centre, SickKids Hospital, and the Early Cancer Detection Program focuses on hereditary cancer genetics and variant interpretation. The panel has developed a disease-specific annotation protocol using Hypothes.is to enable community curation of VHL variants and accelerate resolution of variants of uncertain significance.
 
 📄 Read more:  
 [Developing a disease-specific annotation protocol for VHL gene curation using Hypothes.is](https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/)
@@ -36,23 +36,7 @@ Refer to the original criteria [here](https://cspec.genome.network/cspec/ui/svi/
 """
 )
 
-st.markdown(
-    """
-**Example variants:**  
-NM_000551.4(VHL):c.263+1G>A  
-NM_000551.4(VHL):c.119_340del  
-NM_000551.4(VHL):c.123+5G>A  
-NM_000551.4(VHL):c.1A>T (p.Met1Leu)  
-NM_000551.4(VHL):c.160A>T (p.Met54Leu)  
-NM_000551.4(VHL):c.150G>A (p.Pro50=)  
-NM_000551.4(VHL):c.408del (p.Phe136fs)  
-NM_000551.4(VHL):c.120_122del (p.Val41del)  
-NM_000551.4(VHL):c.190_195dup (p.Lys64_Leu65dup)  
-NM_000551.4(VHL):c.263G>A (p.Trp88Ter)
-"""
-)
-
-hgvs_input = st.text_input("HGVS c. Notation (see examples above)", "")
+hgvs_input = st.text_input("HGVS c. Notation (see examples below)", "")
 
 with st.expander("PVS1/PS1 Options"):
     st.markdown("### PVS1 Options")
@@ -85,6 +69,9 @@ with st.expander("PS2 (De Novo) Options"):
         st.warning(
             "PS2 cannot be assigned if any family history of VHL disease is present. This overrides all other options."
         )
+        is_de_novo = False
+        phenotype = None
+        panel_neg = {}
     else:
         st.markdown(
             """
@@ -149,7 +136,52 @@ If incomplete, only PS2_Supporting can be assigned.
                     else None
                 )
 
-# Run classifiers only if variant entered
+# ---------- Example variants table ----------
+st.markdown("### Example variants")
+
+example_variants = pd.DataFrame(
+    {
+        "Example": [
+            "NM_000551.4(VHL):c.263+1G>A",
+            "NM_000551.4(VHL):c.119_340del",
+            "NM_000551.4(VHL):c.123+5G>A",
+            "NM_000551.4(VHL):c.1A>T (p.Met1Leu)",
+            "NM_000551.4(VHL):c.160A>T (p.Met54Leu)",
+            "NM_000551.4(VHL):c.150G>A (p.Pro50=)",
+            "NM_000551.4(VHL):c.408del (p.Phe136fs)",
+            "NM_000551.4(VHL):c.120_122del (p.Val41del)",
+            "NM_000551.4(VHL):c.190_195dup (p.Lys64_Leu65dup)",
+            "NM_000551.4(VHL):c.263G>A (p.Trp88Ter)",
+        ],
+        "Context": [
+            "Canonical donor splice variant to exercise PVS1 splice rules.",
+            "Multi-exon deletion to demonstrate very strong truncating PVS1 evidence.",
+            "Non-canonical splice variant to test nuanced PVS1 splice strength.",
+            "Start-loss variant at the initiation codon for special PVS1 handling.",
+            "Missense in a functionally important region to explore PS1/PM1 logic.",
+            "Synonymous variant with no amino acid change for benign/BP-style scenarios.",
+            "Single-base frameshift to test NMD boundary and truncating logic.",
+            "In-frame deletion for PM4 and domain-specific protein effects.",
+            "In-frame duplication to check tandem vs non-tandem duplication rules.",
+            "Classic nonsense variant to illustrate straightforward very strong PVS1.",
+        ],
+    }
+)
+
+def blue_table_style(df):
+    return df.style.set_properties(
+        **{
+            "background-color": "#e8f2ff",
+            "border-color": "#a3b8e6",
+        }
+    )
+
+st.dataframe(
+    blue_table_style(example_variants),
+    use_container_width=True,
+)
+
+# ---------- Run classifiers only if variant entered ----------
 if hgvs_input:
     pvs1_result = classify_vhl_pvs1(
         hgvs_input,

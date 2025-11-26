@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="Rules for Combining Criteria", page_icon="📋", layout="wide")
+# DO NOT call st.set_page_config() in page files when using pages/ directory
 
 st.title("Rules for Combining Criteria")
 
