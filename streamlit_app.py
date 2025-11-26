@@ -4,56 +4,108 @@ from vhl_pvs1 import classify_vhl_pvs1  # Import PVS1 classifier
 from vhl_ps1 import classify_vhl_ps1    # Import PS1 classifier
 from vhl_ps2 import classify_vhl_ps2    # Import PS2 classifier
 
-# ---- Sidebar: visually enhanced rules for combining ----
+# ---- Sidebar: VHL VCEP intro + visually enhanced rules for combining ----
 st.sidebar.markdown("""
 <style>
-    .sidebar-title {font-size: 22px; font-weight: bold; color: #155a90;}
-    .category {font-size: 17px; font-weight: bold; margin-top: 12px;}
-    .combo-rule {margin-bottom: 6px;}
-    .rule-label {font-weight: bold; color: #2c2c2c;}
-    .pathogenic {background: #ffe4e4; border-radius: 7px; padding: 7px;}
-    .likely_pathogenic {background: #fff3d6; border-radius: 7px; padding: 7px;}
-    .benign {background: #e8fae8; border-radius: 7px; padding: 7px;}
-    .likely_benign {background: #f8fbee; border-radius: 7px; padding: 7px;}
+    .sidebar-intro {
+        font-size: 14px; 
+        line-height: 1.6; 
+        margin-bottom: 20px; 
+        padding: 10px; 
+        background: #f0f4f8; 
+        border-radius: 8px;
+        color: #2c3e50;
+    }
+    .sidebar-title {
+        font-size: 20px; 
+        font-weight: bold; 
+        color: #1a5490; 
+        margin-bottom: 10px;
+    }
+    .category {
+        font-size: 16px; 
+        font-weight: bold; 
+        margin-top: 14px; 
+        padding: 8px; 
+        border-radius: 8px;
+    }
+    .combo-rule {
+        margin-bottom: 8px; 
+        line-height: 1.5;
+    }
+    .rule-label {
+        font-weight: bold; 
+        color: #222;
+    }
+    .pathogenic {
+        background: #fdeaea; 
+        border-left: 4px solid #e74c3c;
+    }
+    .likely_pathogenic {
+        background: #fff8e1; 
+        border-left: 4px solid #f39c12;
+    }
+    .benign {
+        background: #eafaf1; 
+        border-left: 4px solid #27ae60;
+    }
+    .likely_benign {
+        background: #f9fbe7; 
+        border-left: 4px solid #7cb342;
+    }
 </style>
+
+<div class='sidebar-intro'>
+    <b>About VHL VCEP</b><br/>
+    The <b>VHL Variant Curation Expert Panel (VCEP)</b> is part of ClinGen's effort to provide expert-level clinical validity for genetic variants. Led by <b>Dr. Raymond H. Kim</b>, chair of the VCEP and Principal Investigator at the Princess Margaret Cancer Centre, University Health Network, and SickKids Hospital, the panel leverages community curation to resolve variants of uncertain significance (VUS) in the <i>VHL</i> gene.<br/><br/>
+    Dr. Kim's <b>Early Cancer Detection Program</b> at UHN has pioneered innovative approaches including a disease-specific annotation protocol using Hypothes.is, enabling crowdsourced biocuration by students and trainees. This enhances knowledge translation in hereditary cancer genetics and accelerates variant classification efforts for VHL disease.<br/><br/>
+    📄 <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/" target="_blank" style="color:#1a5490;">Read the protocol paper here</a>
+</div>
+
 <div class='sidebar-title'>🧩 Rules for Combining Criteria</div>
 
-<div class='category pathogenic'>🔴 <b>Pathogenic</b>
-<ul style="margin-bottom:6px;">
-    <li class='combo-rule'><span class='rule-label'>1 Very Strong</span> <small>(PVS1, PS2_VeryStrong, PS4_VeryStrong)</small> <br/>
-        <b>AND</b> <span class='rule-label'>1 Strong</span> <small>(PS1, PS2, PS4, PP1_Strong)</small></li>
-    <li class='combo-rule'><span class='rule-label'>1 Very Strong</span> <b>AND</b> <span class='rule-label'>2 Moderate</span> <small>(PS2_Moderate, PS4_Moderate, PM1, PM4, PM5, PM6, PP1_Moderate)</small></li>
-    <li class='combo-rule'><span class='rule-label'>1 Very Strong</span> <b>AND</b> <span class='rule-label'>1 Moderate</span> <b>AND</b> <span class='rule-label'>1 Supporting</span> <small>(PS2_Supporting, PS3_Supporting, PS4_Supporting, PM1_Supporting, PM2_Supporting, PP1, PP3)</small></li>
-    <li class='combo-rule'><span class='rule-label'>1 Very Strong</span> <b>AND</b> <span class='rule-label'>2 Supporting</span></li>
-    <li class='combo-rule'><span class='rule-label'>&ge; 2 Strong</span></li>
-    <li class='combo-rule'><span class='rule-label'>1 Strong</span> <b>AND</b> <span class='rule-label'>&ge; 3 Moderate</span></li>
-    <li class='combo-rule'><span class='rule-label'>1 Strong</span> <b>AND</b> <span class='rule-label'>2 Moderate</span> <b>AND</b> <span class='rule-label'>2 Supporting</span></li>
-    <li class='combo-rule'><span class='rule-label'>1 Strong</span> <b>AND</b> <span class='rule-label'>1 Moderate</span> <b>AND</b> <span class='rule-label'>&ge; 4 Supporting</span></li>
-</ul>
+<div class='category pathogenic'>
+    🔴 <b>Pathogenic</b>
+    <ul style="margin:8px 0; padding-left:20px;">
+        <li class='combo-rule'><span class='rule-label'>1 Very Strong</span> <small>(PVS1, PS2_VeryStrong, PS4_VeryStrong)</small><br/>
+            <b>AND</b> <span class='rule-label'>1 Strong</span> <small>(PS1, PS2, PS4, PP1_Strong)</small></li>
+        <li class='combo-rule'><span class='rule-label'>1 Very Strong AND 2 Moderate</span><br/>
+            <small>(PS2_Moderate, PS4_Moderate, PM1, PM4, PM5, PM6, PP1_Moderate)</small></li>
+        <li class='combo-rule'><span class='rule-label'>1 Very Strong AND 1 Moderate AND 1 Supporting</span><br/>
+            <small>(PS2_Supporting, PS3_Supporting, PS4_Supporting, PM1_Supporting, PM2_Supporting, PP1, PP3)</small></li>
+        <li class='combo-rule'><span class='rule-label'>1 Very Strong AND 2 Supporting</span></li>
+        <li class='combo-rule'><span class='rule-label'>&ge; 2 Strong</span></li>
+        <li class='combo-rule'><span class='rule-label'>1 Strong AND &ge; 3 Moderate</span></li>
+        <li class='combo-rule'><span class='rule-label'>1 Strong AND 2 Moderate AND 2 Supporting</span></li>
+        <li class='combo-rule'><span class='rule-label'>1 Strong AND 1 Moderate AND &ge; 4 Supporting</span></li>
+    </ul>
 </div>
 
-<div class='category likely_pathogenic'>🟠 <b>Likely Pathogenic</b>
-<ul style="margin-bottom:6px;">
-    <li class='combo-rule'><span class='rule-label'>1 Very Strong</span> <b>AND</b> <span class='rule-label'>1 Moderate</span></li>
-    <li class='combo-rule'><span class='rule-label'>1 Strong</span> <b>AND</b> <span class='rule-label'>&ge; 2 Supporting</span></li>
-    <li class='combo-rule'><span class='rule-label'>&ge; 3 Moderate</span></li>
-    <li class='combo-rule'><span class='rule-label'>2 Moderate</span> <b>AND</b> <span class='rule-label'>&ge; 2 Supporting</span></li>
-    <li class='combo-rule'><span class='rule-label'>1 Moderate</span> <b>AND</b> <span class='rule-label'>&ge; 4 Supporting</span></li>
-</ul>
+<div class='category likely_pathogenic'>
+    🟠 <b>Likely Pathogenic</b>
+    <ul style="margin:8px 0; padding-left:20px;">
+        <li class='combo-rule'><span class='rule-label'>1 Very Strong AND 1 Moderate</span></li>
+        <li class='combo-rule'><span class='rule-label'>1 Strong AND &ge; 2 Supporting</span></li>
+        <li class='combo-rule'><span class='rule-label'>&ge; 3 Moderate</span></li>
+        <li class='combo-rule'><span class='rule-label'>2 Moderate AND &ge; 2 Supporting</span></li>
+        <li class='combo-rule'><span class='rule-label'>1 Moderate AND &ge; 4 Supporting</span></li>
+    </ul>
 </div>
 
-<div class='category benign'>🟢 <b>Benign</b>
-<ul style="margin-bottom:6px;">
-    <li class='combo-rule'><span class='rule-label'>&ge; 2 Strong</span> <small>(BS1, BS2, BS4, BP2_Strong)</small></li>
-    <li class='combo-rule'><span class='rule-label'>1 Stand Alone</span> <small>(BA1)</small></li>
-</ul>
+<div class='category benign'>
+    🟢 <b>Benign</b>
+    <ul style="margin:8px 0; padding-left:20px;">
+        <li class='combo-rule'><span class='rule-label'>&ge; 2 Strong</span> <small>(BS1, BS2, BS4, BP2_Strong)</small></li>
+        <li class='combo-rule'><span class='rule-label'>1 Stand Alone</span> <small>(BA1)</small></li>
+    </ul>
 </div>
 
-<div class='category likely_benign'>🟡 <b>Likely Benign</b>
-<ul style="margin-bottom:6px;">
-    <li class='combo-rule'><span class='rule-label'>1 Strong</span> <b>AND</b> <span class='rule-label'>1 Supporting</span></li>
-    <li class='combo-rule'><span class='rule-label'>&ge; 2 Supporting</span></li>
-</ul>
+<div class='category likely_benign'>
+    🟡 <b>Likely Benign</b>
+    <ul style="margin:8px 0; padding-left:20px;">
+        <li class='combo-rule'><span class='rule-label'>1 Strong AND 1 Supporting</span></li>
+        <li class='combo-rule'><span class='rule-label'>&ge; 2 Supporting</span></li>
+    </ul>
 </div>
 """, unsafe_allow_html=True)
 
