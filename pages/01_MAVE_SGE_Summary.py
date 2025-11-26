@@ -4,9 +4,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
 
-
-# --- Page config ---
-st.set_page_config(page_title="MAVE/SGE summary", layout="wide")
 st.title("MAVE / SGE summary")
 
 st.markdown(
