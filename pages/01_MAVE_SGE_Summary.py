@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from pathlib import Path
 
 st.title("MAVE / SGE summary")
@@ -40,8 +41,11 @@ st.download_button(
 if "alt_pos" not in df.columns:
     st.error("Column 'alt_pos' is missing from the CSV. Please check the input file.")
     st.stop()
+if "sge_region" not in df.columns:
+    st.error("Column 'sge_region' is missing from the CSV. Needed for exon annotation.")
+    st.stop()
 
-# Sort by genomic position and create a dense variant index
+# Sort by genomic position and create dense variant index
 df = df.sort_values("alt_pos").reset_index(drop=True)
 df["genomic_position"] = df["alt_pos"]
 df["variant_index"] = range(len(df))
@@ -79,11 +83,7 @@ with st.sidebar:
     )
 
     # SGE region
-    region_options = (
-        sorted(df["sge_region"].dropna().unique())
-        if "sge_region" in df.columns
-        else []
-    )
+    region_options = sorted(df["sge_region"].dropna().unique())
     selected_regions = st.multiselect(
         "SGE region",
         options=region_options,
@@ -116,7 +116,7 @@ if df_plot.empty:
     st.stop()
 
 
-# --- Build scatter plot (x-axis = variant index) ---
+# --- Build base scatter plot (x-axis = variant index) ---
 fig = px.scatter(
     df_plot,
     x="variant_index",
@@ -128,7 +128,7 @@ fig = px.scatter(
         else None
     ),
     hover_data={
-        "sge_region": "sge_region" in df_plot.columns,
+        "sge_region": True,
         "consequence": "consequence" in df_plot.columns,
         "tier_class": "tier_class" in df_plot.columns,
         "function_score_final": True,
@@ -139,13 +139,50 @@ fig = px.scatter(
     color_discrete_sequence=px.colors.qualitative.Set2,
 )
 
+# --- Add exon / SGE-region bands on x-axis ---
+region_bounds = (
+    df_plot.groupby("sge_region")["variant_index"]
+    .agg(["min", "max"])
+    .reset_index()
+)
+
+exon_colors = px.colors.qualitative.Pastel
+for i, row in region_bounds.iterrows():
+    color = exon_colors[i % len(exon_colors)]
+    # translucent vertical rectangle
+    fig.add_vrect(
+        x0=row["min"],
+        x1=row["max"],
+        fillcolor=color,
+        opacity=0.18,
+        line_width=0,
+        layer="below",
+    )
+    # exon label at top of band
+    fig.add_annotation(
+        x=(row["min"] + row["max"]) / 2,
+        y=df_plot["function_score_final"].max() + 0.2,
+        text=row["sge_region"],
+        showarrow=False,
+        font=dict(size=10, color="#CCCCCC"),
+        yanchor="bottom",
+    )
+
+
+# --- Layout tweaks for a cleaner, wider look ---
 fig.update_layout(
     template="plotly_dark",
     xaxis_title="Variant index",
     yaxis_title="Function score",
     legend_title="ClinVar annotation",
-    height=500,
-    margin=dict(l=40, r=40, t=60, b=40),
+    height=600,
+    margin=dict(l=40, r=40, t=80, b=40),
 )
+
+# Slight extra headroom for exon labels
+fig.update_yaxes(range=[
+    df_plot["function_score_final"].min() - 0.2,
+    df_plot["function_score_final"].max() + 0.6,
+])
 
 st.plotly_chart(fig, use_container_width=True)
