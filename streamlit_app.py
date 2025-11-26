@@ -28,7 +28,7 @@ hgvs_input = st.text_input(
     "HGVS c. Notation (see examples above)", ""
 )
 
-with st.expander("PVS1/PS1 Advanced options"):
+with st.expander("PVS1/PS1 Options"):
     exon_skipping = st.checkbox("Exon Skipping", value=False)
     cryptic_disrupts_rf = st.radio(
         "Cryptic Splice Disrupts Reading Frame?", (None, True, False))

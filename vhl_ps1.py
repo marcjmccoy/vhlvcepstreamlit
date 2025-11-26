@@ -64,7 +64,7 @@ def classify_vhl_ps1(test_variant):
                     return {
                         'strength': 'PS1',
                         'context': (
-                            f"Missense variant with amino acid substitution {protein_change} matches previously established VHL pathogenic missense "
+                            f"Missense variant with amino acid substitution {protein_change} matches previously established VHL VCEP/ClinGen pathogenic missense "
                             f'variant "{var["Preferred Variant Title"]}" [ClinVar_ID: {var["ClinVar_ID"]}, CAID: {var["CAID"]}]. '
                             "PS1 (Strong) applies only if interpretation is by VHL VCEP."
                         )
@@ -73,26 +73,26 @@ def classify_vhl_ps1(test_variant):
         return {
             'strength': None,
             'context': (
-                f"Missense substitution ({protein_change}) but no matching VHL VCEP pathogenic missense in the reference list; PS1 does not apply."
+                f"Missense substitution ({protein_change}) but no matching VHL VCEP/ClinGen pathogenic missense in the reference list; PS1 does not apply."
             )
         }
 
     # All other types return context per ACMG/AMP PS1 guideline
     elif vt == "splice":
         return {'strength': None,
-                'context': "Splice site variant—PS1 applies only to missense substitutions, not variants mainly affecting splicing."}
+                'context': "This is a splice site variant; PS1 applies only to missense substitutions, not variants mainly affecting splicing."}
     elif vt == "frameshift":
         return {'strength': None,
-                'context': "Frameshift variant—PS1 applies only to missense substitutions, not frameshift/loss-of-function variants."}
+                'context': "This is a frameshift variant; PS1 applies only to missense substitutions, not frameshift/loss-of-function variants."}
     elif vt == "nonsense":
         return {'strength': None,
-                'context': "Nonsense/stop-gain variant—PS1 is not applicable; only scored for missense substitutions."}
+                'context': "This is a nonsense/stop-gain variant; PS1 is not applicable; only scored for missense substitutions."}
     elif vt in ["inframe_del", "inframe_dup", "inframe_ins"]:
         return {'strength': None,
-                'context': f"In-frame {vt.split('_')[1]} variant—PS1 not applicable. Only applies to single amino acid substitutions."}
+                'context': f"This is an in-frame {vt.split('_')[1]} variant; PS1 is not applicable."}
     else:
         details = []
         if not protein_change:
             details.append("No explicit amino acid change in input HGVS.")
-        details.append("PS1 can only be considered for single amino acid substitutions matching established pathogenic VHL missense variants.")
+        details.append("PS1 can only be considered for variants matching established pathogenic VHL VCEP/ClinGen variants.")
         return {'strength': None, 'context': "; ".join(details)}
