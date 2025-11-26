@@ -41,13 +41,10 @@ if "alt_pos" not in df.columns:
     st.error("Column 'alt_pos' is missing from the CSV. Please check the input file.")
     st.stop()
 
-# Sort by genomic position and create indices
+# Sort by genomic position and create a dense variant index
 df = df.sort_values("alt_pos").reset_index(drop=True)
 df["genomic_position"] = df["alt_pos"]
-
-# Dense index across all variants
-df["position_index"] = range(len(df))
-df["position_index_scaled"] = df["position_index"] / (len(df) - 1 if len(df) > 1 else 1)
+df["variant_index"] = range(len(df))
 
 
 # --- ClinVar category handling ---
@@ -101,16 +98,6 @@ with st.sidebar:
         default=clinvar_options,
     )
 
-    # X-axis choice
-    x_mode = st.radio(
-        "X-axis scale",
-        options=["Variant index", "Genomic position"],
-        index=0,
-    )
-
-    # Optional scaling within chosen x variable
-    scale_genomic = st.checkbox("Scale x-axis to 0–1", value=True)
-
 
 # --- Apply filters ---
 mask = pd.Series(True, index=df.index)
@@ -129,32 +116,10 @@ if df_plot.empty:
     st.stop()
 
 
-# --- X-axis handling ---
-if x_mode == "Variant index":
-    if scale_genomic:
-        x_col = "position_index_scaled"
-        xaxis_title = "Variant index (scaled)"
-    else:
-        x_col = "position_index"
-        xaxis_title = "Variant index"
-else:  # Genomic position
-    if scale_genomic:
-        x_min, x_max = df_plot["genomic_position"].min(), df_plot["genomic_position"].max()
-        if x_max == x_min:
-            df_plot["x_scaled"] = 0.5
-        else:
-            df_plot["x_scaled"] = (df_plot["genomic_position"] - x_min) / (x_max - x_min)
-        x_col = "x_scaled"
-        xaxis_title = "Genomic position (scaled)"
-    else:
-        x_col = "genomic_position"
-        xaxis_title = "Genomic position"
-
-
-# --- Build scatter plot ---
+# --- Build scatter plot (x-axis = variant index) ---
 fig = px.scatter(
     df_plot,
-    x=x_col,
+    x="variant_index",
     y="function_score_final",
     color="clinvar_simple",
     hover_name=(
@@ -169,15 +134,14 @@ fig = px.scatter(
         "function_score_final": True,
         "rna_score": "rna_score" in df_plot.columns,
         "genomic_position": True,
-        "position_index": True,
-        "position_index_scaled": True,
+        "variant_index": True,
     },
     color_discrete_sequence=px.colors.qualitative.Set2,
 )
 
 fig.update_layout(
     template="plotly_dark",
-    xaxis_title=xaxis_title,
+    xaxis_title="Variant index",
     yaxis_title="Function score",
     legend_title="ClinVar annotation",
     height=500,
