@@ -3,12 +3,11 @@ import pandas as pd
 import plotly.express as px
 from pathlib import Path
 
-
 st.title("MAVE / SGE summary")
 
 st.markdown(
     """
-This page summarizes VHL saturation genome editing (SGE/MAVE) data from Findlay et al.,
+This page summarizes [VHL saturation genome editing (SGE/MAVE) data from Findlay et al.](https://www.nature.com/articles/s41588-024-01800-z),
 showing functional scores across the gene, colored by ClinVar-level annotation.
 """
 )
@@ -22,7 +21,7 @@ def load_mave_data(path: Path) -> pd.DataFrame:
     return df
 
 
-# CSV is in the project root, one level above `pages/`
+# CSV is in project root, one level above `pages/`
 BASE_DIR = Path(__file__).parent.parent
 data_path = BASE_DIR / "Findlay_MAVE_processed.csv"
 df = load_mave_data(data_path)
@@ -42,7 +41,13 @@ if "alt_pos" not in df.columns:
     st.error("Column 'alt_pos' is missing from the CSV. Please check the input file.")
     st.stop()
 
+# Sort by genomic position and create indices
+df = df.sort_values("alt_pos").reset_index(drop=True)
 df["genomic_position"] = df["alt_pos"]
+
+# Dense index across all variants
+df["position_index"] = range(len(df))
+df["position_index_scaled"] = df["position_index"] / (len(df) - 1 if len(df) > 1 else 1)
 
 
 # --- ClinVar category handling ---
@@ -96,8 +101,15 @@ with st.sidebar:
         default=clinvar_options,
     )
 
-    # Scaling toggle
-    scale_genomic = st.checkbox("Genomic position at scale", value=False)
+    # X-axis choice
+    x_mode = st.radio(
+        "X-axis scale",
+        options=["Variant index", "Genomic position"],
+        index=0,
+    )
+
+    # Optional scaling within chosen x variable
+    scale_genomic = st.checkbox("Scale x-axis to 0–1", value=True)
 
 
 # --- Apply filters ---
@@ -117,23 +129,32 @@ if df_plot.empty:
     st.stop()
 
 
-# --- X-axis scaling ---
-if scale_genomic:
-    x_min, x_max = df_plot["genomic_position"].min(), df_plot["genomic_position"].max()
-    if x_max == x_min:
-        df_plot["x_position"] = 0.5
+# --- X-axis handling ---
+if x_mode == "Variant index":
+    if scale_genomic:
+        x_col = "position_index_scaled"
+        xaxis_title = "Variant index (scaled)"
     else:
-        df_plot["x_position"] = (df_plot["genomic_position"] - x_min) / (x_max - x_min)
-    xaxis_title = "Scaled genomic position"
-else:
-    df_plot["x_position"] = df_plot["genomic_position"]
-    xaxis_title = "Unscaled genomic position"
+        x_col = "position_index"
+        xaxis_title = "Variant index"
+else:  # Genomic position
+    if scale_genomic:
+        x_min, x_max = df_plot["genomic_position"].min(), df_plot["genomic_position"].max()
+        if x_max == x_min:
+            df_plot["x_scaled"] = 0.5
+        else:
+            df_plot["x_scaled"] = (df_plot["genomic_position"] - x_min) / (x_max - x_min)
+        x_col = "x_scaled"
+        xaxis_title = "Genomic position (scaled)"
+    else:
+        x_col = "genomic_position"
+        xaxis_title = "Genomic position"
 
 
-# --- Plot ---
+# --- Build scatter plot ---
 fig = px.scatter(
     df_plot,
-    x="x_position",
+    x=x_col,
     y="function_score_final",
     color="clinvar_simple",
     hover_name=(
@@ -147,8 +168,9 @@ fig = px.scatter(
         "tier_class": "tier_class" in df_plot.columns,
         "function_score_final": True,
         "rna_score": "rna_score" in df_plot.columns,
-        "x_position": False,
         "genomic_position": True,
+        "position_index": True,
+        "position_index_scaled": True,
     },
     color_discrete_sequence=px.colors.qualitative.Set2,
 )
