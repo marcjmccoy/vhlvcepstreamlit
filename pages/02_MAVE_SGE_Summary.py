@@ -3,8 +3,6 @@ import pandas as pd
 import plotly.express as px
 from pathlib import Path
 
-
-st.set_page_config(page_title="MAVE/SGE summary", layout="wide")
 st.title("MAVE / SGE summary")
 
 
