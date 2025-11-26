@@ -16,7 +16,7 @@ def classify_vhl_ps2(
     RCC_PHEO_PANEL = {"MAX", "FH", "SDHA", "SDHB", "SDHC", "SDHD", "SDHAF2", "TMEM127"}
     SDHX = {"SDHA", "SDHB", "SDHC", "SDHD", "SDHAF2"}
 
-    # All panel genes offered in the app
+    # All panel genes offered in the app (not directly used in scoring)
     STREAMLIT_GENES = ["SDHB", "SDHC", "SDHD", "RET", "MAX", "FH", "TMEM127", "NF1", "SDHA", "SDHAF2", "VHL"]
 
     # Variant type recognition
@@ -24,7 +24,10 @@ def classify_vhl_ps2(
     is_nonsense = "Ter" in hgvs_str or "*" in hgvs_str or "stop" in hgvs_str
     is_frameshift = "fs" in hgvs_str
     is_splice = "+" in hgvs_str or "-" in hgvs_str or re.search(r'splice', hgvs_str)
-    is_inframe_indel = "del" in hgvs_str and not "fs" in hgvs_str or "dup" in hgvs_str and not "fs" in hgvs_str
+    is_inframe_indel = (
+        ("del" in hgvs_str and not "fs" in hgvs_str) or
+        ("dup" in hgvs_str and not "fs" in hgvs_str)
+    )
 
     # Eligibility checks
     if not is_de_novo:
@@ -46,7 +49,7 @@ def classify_vhl_ps2(
     score = 0
     context_lines = []
 
-    # Which genes were marked negative by user
+    # Collate negative-tested genes, if provided by user
     if panel_neg:
         neg_list = [gene for gene, result in panel_neg.items() if result == "neg"]
         neg_panel_str = f"Panel genes marked negative: {', '.join(sorted(neg_list))}."
@@ -54,7 +57,7 @@ def classify_vhl_ps2(
         neg_list = []
         neg_panel_str = "Panel testing results not provided."
 
-    # Danish/International Criteria handling
+    # Highly specific phenotype (e.g., Danish criteria)
     if phenotype == "danish":
         score = 2
         context_lines.append(
@@ -69,20 +72,18 @@ def classify_vhl_ps2(
         context_lines.append(neg_panel_str)
 
     elif phenotype == "consistent":
-        # VHL2c / Pheo only phenotype requires extensive panel
+        # Panel completeness checks
         missing_pheo = [gene for gene in VHL2C_PHEO_PANEL if gene not in neg_list]
         missing_rcc_pheo = [gene for gene in RCC_PHEO_PANEL if gene not in neg_list]
-        missing_sdhx = [gene for gene in SDHX if gene not in neg_list]
         panel_tested = bool(panel_neg)
-
-        # If all VHL2c pheo panel genes negative, assign Moderate; else Supporting
+        
         if panel_tested and not missing_pheo:
             score = 1
             context_lines.append(
-                "Phenotype is consistent with VHL (VHL2c, Pheo only), AND comprehensive panel testing negative for all required genes (MAX, NF1, RET, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127, VHL)."
+                "Phenotype is consistent with VHL (VHL2c, Pheo only), AND comprehensive panel testing is negative for all required genes (MAX, NF1, RET, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127, VHL)."
             )
             context_lines.append(
-                "This excludes other hereditary entities (e.g., SDHX, RET, MAX, TMEM127, NF1, VHL), meeting VHL VCEP requirements for PS2_Moderate evidence (1 point)."
+                "This fulfills ACMG VCEP requirements for PS2_Moderate evidence (1 point)."
             )
             context_lines.append(neg_panel_str)
         elif panel_tested and missing_pheo:
@@ -90,18 +91,15 @@ def classify_vhl_ps2(
             context_lines.append(
                 f"Phenotype is consistent with VHL (VHL2c, Pheo only), but the following required panel genes were not shown negative: {', '.join(missing_pheo)}."
             )
-            context_lines.append(
-                "As panel is incomplete, scoring downgraded to PS2_Supporting (0.5 points)."
-            )
+            context_lines.append("As panel is incomplete, scoring downgraded to PS2_Supporting (0.5 points).")
             context_lines.append(neg_panel_str)
         elif panel_tested and not missing_rcc_pheo:
-            # RCC+Pheo with comprehensive panel negativity
             score = 1
             context_lines.append(
                 "Phenotype is consistent with VHL (RCC+Pheo) and comprehensive panel testing is negative for MAX, FH, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127."
             )
             context_lines.append(
-                "This fulfills ACMG VCEP guidance for PS2_Moderate evidence (1 point)."
+                "This fulfills ACMG VCEP requirements for PS2_Moderate evidence (1 point)."
             )
             context_lines.append(neg_panel_str)
         elif panel_tested and missing_rcc_pheo:
@@ -109,16 +107,21 @@ def classify_vhl_ps2(
             context_lines.append(
                 f"Phenotype is consistent with VHL (RCC+Pheo), but the following required panel genes were not shown negative: {', '.join(missing_rcc_pheo)}."
             )
-            context_lines.append(
-                "Because comprehensive panel testing is incomplete, scoring downgraded to PS2_Supporting (0.5 points)."
-            )
+            context_lines.append("Because comprehensive panel testing is incomplete, scoring downgraded to PS2_Supporting (0.5 points).")
             context_lines.append(neg_panel_str)
         elif not panel_tested:
-            # Panel not done: always downgrade
+            # ***CRITICAL COMMENT - IMAGE-BASED RULE***
+            # Per ACMG VCEP scoring table (see attached image):
+            # If a proband with RCC+Pheo and no family history lacks panel testing,
+            # count as "Phenotype consistent with the gene but not highly specific" (0.5 points, PS2_Supporting).
+            # Never assign 1 (Moderate) unless comprehensive panel is confirmed negative.
             score = 0.5
             context_lines.append(
-                "Consistent phenotype with VHL, but no panel testing information is available; score is downgraded to PS2_Supporting (0.5 points) as additional possible genetic etiologies can't be excluded."
+                "Phenotype is consistent with VHL (e.g., RCC+Pheo or VHL2c), but no comprehensive panel testing information is available. "
+                "Per ACMG VCEP and scoring table, this is PS2_Supporting (0.5 points) since other genetic etiologies cannot be excluded."
             )
+            context_lines.append(neg_panel_str)
+
     elif phenotype == "nonspecific":
         score = 0.5
         context_lines.append(
@@ -131,7 +134,7 @@ def classify_vhl_ps2(
             "Phenotype was not categorized; PS2 cannot be scored."
         )
 
-    # SVI-guided label logic
+    # SVI-guided label logic (VCEP/ClinGen rules)
     if score >= 4:
         strength = "PS2_VeryStrong"
         context_lines.append(
