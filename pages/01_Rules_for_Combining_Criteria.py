@@ -11,7 +11,7 @@ They reflect the standard framework applied by the VHL VCEP when integrating PVS
 """
 )
 
-st.markdown("## 🔴 Pathogenic")
+st.markdown("## 🔴 Pathogenic (P)")
 st.markdown(
     """
 - **1 Very Strong** (PVS1, PS2_VeryStrong, PS4_VeryStrong) **AND ≥ 1 Strong** (PS1, PS2, PS4, PP1_Strong)  
@@ -34,7 +34,7 @@ st.markdown(
 """
 )
 
-st.markdown("## 🟠 Likely Pathogenic")
+st.markdown("## 🟠 Likely Pathogenic (LP)")
 st.markdown(
     """
 - **1 Very Strong** (PVS1, PS2_VeryStrong, PS4_VeryStrong) **AND 1 Moderate**  
@@ -56,7 +56,7 @@ st.markdown(
 """
 )
 
-st.markdown("## 🟢 Benign")
+st.markdown("## 🟢 Benign (B)")
 st.markdown(
     """
 - **≥ 2 Strong** (BS1, BS2, BS4, BP2_Strong)  
@@ -64,7 +64,7 @@ st.markdown(
 """
 )
 
-st.markdown("## 🟡 Likely Benign")
+st.markdown("## 🟡 Likely Benign (LB)")
 st.markdown(
     """
 - **1 Strong** (BS1, BS2, BS4, BP2_Strong) **AND 1 Supporting**  
