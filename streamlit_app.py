@@ -13,6 +13,33 @@ st.set_page_config(
     layout="wide",
 )
 
+# ---------------- CSS for wrapped tables ----------------
+st.markdown(
+    """
+    <style>
+    .vhl-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .vhl-table th, .vhl-table td {
+        white-space: normal !important;
+        word-wrap: break-word;
+        max-width: 350px;
+        text-align: left;
+        vertical-align: top;
+        padding: 0.25rem 0.5rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+def show_wrapped_table(df: pd.DataFrame) -> None:
+    """Render a DataFrame with wrapped text in cells."""
+    html = df.to_html(index=False, escape=False)
+    st.markdown(f'<div class="vhl-table">{html}</div>', unsafe_allow_html=True)
+
 
 # ---------------- Sidebar: About ----------------
 st.sidebar.markdown(
@@ -26,9 +53,8 @@ Detection Program focuses on hereditary cancer genetics and variant interpretati
 has developed a disease-specific annotation protocol using Hypothes.is to enable community
 curation of VHL variants and accelerate resolution of variants of uncertain significance.
 
-📄 Read more in the [VHL VCEP protocol paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/)
-📄 Reference the [ClinGen VHL Expert Panel Guideline](https://cspec.genome.network/cspec/ui/svi/doc/GN078)
-
+- 📄 Read more in the [VHL VCEP protocol paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/)
+- 📄 Reference the [ClinGen VHL Expert Panel Guideline](https://cspec.genome.network/cspec/ui/svi/doc/GN078)
 """
 )
 
@@ -91,16 +117,13 @@ original [ACMG/AMP Variant Interpretation Guidelines for VHL Version 1.1.0](http
 """
 )
 
-
 # ---------------- Example variants (above input) ----------------
 st.markdown("### Example variants")
 example_variants = build_example_variants_df()
-st.dataframe(example_variants, use_container_width=True)
-
+show_wrapped_table(example_variants)
 
 # ---------------- HGVS input ----------------
 hgvs_input = st.text_input("HGVS c. Notation (see examples above)", "")
-
 
 # ---------------- PVS1 / PS1 options ----------------
 with st.expander("PVS1 / PS1 Options"):
@@ -126,7 +149,6 @@ with st.expander("PVS1 / PS1 Options"):
         index=0,
     )
 
-
 # ---------------- PS2 (De novo) options ----------------
 with st.expander("PS2 (De Novo) Options"):
     st.markdown(
@@ -137,7 +159,7 @@ with st.expander("PS2 (De Novo) Options"):
 - When there is no family history, PS2 strength depends on:
   - Confirmed de novo status (maternity and paternity tested).
   - Phenotype category.
-  - Completeness and negativity of the relevant gene panel.[web:1][web:2]
+  - Completeness and negativity of the relevant gene panel.
 """
     )
 
@@ -165,7 +187,7 @@ To achieve **Moderate (1 point)** PS2 evidence:
 
 1. Confirmed de novo status (both maternity and paternity testing performed).
 2. For *Highly specific* or *Consistent* phenotypes, all required genes must be negative
-   on panel testing.[web:1][web:2]
+   on panel testing.
 
 If the panel is incomplete or not performed, only **Supporting (0.5 points)** PS2
 evidence can be assigned, even with confirmed de novo status.
@@ -197,10 +219,10 @@ evidence can be assigned, even with confirmed de novo status.
             """
 **Panel results (should be negative to maximize evidence):**
 
-- For VHL2c (pheochromocytoma-only): all of  
+- For VHL2c (pheochromocytoma-only): all of
   [MAX, NF1, RET, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127, VHL] should be negative.
-- For RCC+Pheo: all of  
-  [MAX, FH, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127] should be negative.[web:1][web:2]
+- For RCC+Pheo: all of
+  [MAX, FH, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127] should be negative.
 
 If these panels are incomplete or unknown, only PS2_Supporting can be assigned.
 """
@@ -258,7 +280,9 @@ def run_classifiers(
 
     # PS2
     effective_is_de_novo = is_de_novo if not family_history else False
-    effective_phenotype = phenotype if (not family_history and phenotype is not None) else None
+    effective_phenotype = (
+        phenotype if (not family_history and phenotype is not None) else None
+    )
     effective_panel = (
         {gene: result for gene, result in panel_neg.items() if result == "neg"}
         if not family_history
@@ -276,6 +300,7 @@ def run_classifiers(
     return pvs1_result, ps1_result, ps2_result
 
 
+# ---------------- Trigger classification ----------------
 if hgvs_input:
     pvs1_result, ps1_result, ps2_result = run_classifiers(
         hgvs_input,
@@ -290,6 +315,7 @@ if hgvs_input:
     )
 
     st.header("Classification results")
+
     st.subheader("PVS1")
     st.write(pvs1_result)
 
