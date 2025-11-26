@@ -29,6 +29,7 @@ hgvs_input = st.text_input(
 )
 
 with st.expander("PVS1/PS1 Options"):
+    st.markdown("### PVS1 Options")
     exon_skipping = st.checkbox("Exon Skipping", value=False)
     cryptic_disrupts_rf = st.radio(
         "Cryptic Splice Disrupts Reading Frame?", (None, True, False))
@@ -41,31 +42,10 @@ with st.expander("PS2 (De Novo) Options"):
     st.markdown(
         """
         **Scoring Clarity for PS2:**
+
         - If **ANY family history** of VHL disease is present, PS2 evidence cannot be assigned and results will indicate this restriction.
-        - To achieve **Moderate (1 point)** PS2 evidence, you MUST:
-            - Select "Confirmed de novo" (both maternity and paternity testing done) **AND**
-            - For *Consistent* or *RCC+Pheo* phenotypes, select all required genes as negative in the gene panel section below.
-        - If panel is incomplete or untested, only **Supporting (0.5 points)** evidence can be assigned, even with confirmed de novo status.
         """
     )
-
-    is_de_novo = st.checkbox(
-        "Confirmed de novo (both maternity and paternity tested)",
-        value=False,
-        help="Check only if BOTH maternity and paternity testing confirm de novo status."
-    )
-
-    phenotype = st.selectbox(
-        "Phenotype category",
-        (None, "danish", "consistent", "nonspecific"),
-        format_func=lambda x: {
-            None: "Not specified",
-            "danish": "Highly specific (Danish/International criteria)",
-            "consistent": "Consistent with gene (e.g. VHL2c, RCC+Pheo as per specs)",
-            "nonspecific": "Nonspecific phenotype"
-        }.get(x, x)
-    )
-
     family_history = st.checkbox(
         "Any family history of VHL?",
         value=False,
@@ -74,26 +54,57 @@ with st.expander("PS2 (De Novo) Options"):
 
     if family_history:
         st.warning("PS2 cannot be assigned if any family history of VHL disease is present. This overrides all other options.")
+    else:
+        st.markdown(
+            """
+            To achieve **Moderate (1 point)** PS2 evidence, you MUST:
+            1. Confirmed de novo status (both maternity and paternity testing done)
+            2. For *Consistent* or *RCC+Pheo* phenotypes, all required genes must be negative.
+            * If panel is incomplete or untested, only **Supporting (0.5 points)** evidence can be assigned, even with confirmed de novo status.
+            """
+        )
+        is_de_novo = st.checkbox(
+            "Confirmed de novo (both maternity and paternity tested)",
+            value=False,
+            help="Check only if BOTH maternity and paternity testing confirm de novo status."
+        )
 
-    st.markdown(
-        """
-        **Panel Results (should be negative to maximize evidence):**
-        - For VHL2c (pheo only) phenotype: Ensure **all** [MAX, NF1, RET, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127, VHL] are selected as negative for highest PS2 evidence.
-        - For RCC+Pheo phenotype: Negative for **all** [MAX, FH, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127].
-        - **If testing is incomplete or any genes are not marked negative, only Supporting strength can be assigned.**
-        """
-    )
+        st.markdown("**Select phenotype category:**")
+        phenotype = st.selectbox(
+            "Phenotype category",
+            (None, "danish", "consistent", "nonspecific"),
+            format_func=lambda x: {
+                None: "Not specified",
+                "danish": "Highly specific (Danish/International criteria)",
+                "consistent": "Consistent with gene (e.g. VHL2c, RCC+Pheo as per specs)",
+                "nonspecific": "Nonspecific phenotype"
+            }.get(x, x)
+        )
 
-    panel_genes = [
-        "SDHB", "SDHC", "SDHD", "RET", "MAX", "FH", "TMEM127",
-        "NF1", "SDHA", "SDHAF2", "VHL"
-    ]
-    panel_neg = {}
-    for gene in panel_genes:
-        panel_neg[gene] = "neg" if st.checkbox(
-            f"{gene} negative", value=False, key=gene
-        ) else None
+        st.markdown(
+            """
+            **Panel Results (should be negative to maximize evidence):**
 
+            - For VHL2c (pheo only) phenotype: All [MAX, NF1, RET, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127, VHL] must be negative.
+            - For RCC+Pheo phenotype: All [MAX, FH, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127] must be negative.
+            - If testing is incomplete or any genes are not negative, only Supporting strength can be assigned.
+            """
+        )
+
+        st.markdown("**Mark gene panel results below:**")
+        panel_genes = [
+            "SDHB", "SDHC", "SDHD", "RET", "MAX", "FH", "TMEM127",
+            "NF1", "SDHA", "SDHAF2", "VHL"
+        ]
+        panel_neg = {}
+        cols = st.columns(4)
+        for i, gene in enumerate(panel_genes):
+            with cols[i % 4]:
+                panel_neg[gene] = "neg" if st.checkbox(
+                    f"{gene} negative", value=False, key=gene
+                ) else None
+
+# Classifiers are run only if a variant is submitted
 if hgvs_input:
     pvs1_result = classify_vhl_pvs1(
         hgvs_input,
@@ -105,9 +116,9 @@ if hgvs_input:
     ps1_result = classify_vhl_ps1(hgvs_input)  # Adjust args if needed
     ps2_result = classify_vhl_ps2(
         hgvs_input,
-        is_de_novo=is_de_novo,
-        phenotype=phenotype if phenotype is not None else None,
-        panel_neg={gene: result for gene, result in panel_neg.items() if result == "neg"},
+        is_de_novo=is_de_novo if not family_history else False,
+        phenotype=phenotype if not family_history and phenotype is not None else None,
+        panel_neg={gene: result for gene, result in panel_neg.items() if result == "neg"} if not family_history else {},
         family_history=family_history
     )
     st.header("Classification Results")
