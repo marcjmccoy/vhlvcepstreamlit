@@ -87,11 +87,11 @@ with st.expander("PS2 (De Novo) Options"):
 
             - For VHL2c (pheo only) phenotype: All [MAX, NF1, RET, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127, VHL] must be negative.
             - For RCC+Pheo phenotype: All [MAX, FH, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127] must be negative.
-            - If testing is incomplete or any genes are not negative, only Supporting strength can be assigned.
+            - If testing is incomplete or any genes are not negative, only PS2_Supporting strength can be assigned.
             """
         )
 
-        st.markdown("**Mark gene panel results below:**")
+        st.markdown("**Mark negative testing results below only if confirmed:**")
         panel_genes = [
             "SDHB", "SDHC", "SDHD", "RET", "MAX", "FH", "TMEM127",
             "NF1", "SDHA", "SDHAF2", "VHL"
