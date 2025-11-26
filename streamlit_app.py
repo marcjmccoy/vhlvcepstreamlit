@@ -55,7 +55,7 @@ with st.expander("PS2 (De Novo) Options"):
     panel_genes = ["SDHB", "SDHC", "SDHD", "RET", "MAX", "FH", "TMEM127", "NF1", "SDHA", "SDHAF2", "VHL"]
     panel_neg = {}
     for gene in panel_genes:
-        panel_neg[gene] = "neg" if st.checkbox(f"{gene} panel negative", value=False, key=gene) else None
+        panel_neg[gene] = "neg" if st.checkbox(f"{gene} negative", value=False, key=gene) else None
 
 if hgvs_input:
     pvs1_result = classify_vhl_pvs1(
