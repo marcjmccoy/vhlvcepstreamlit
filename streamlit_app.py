@@ -4,7 +4,7 @@ from vhl_pvs1 import classify_vhl_pvs1  # Import PVS1 classifier
 from vhl_ps1 import classify_vhl_ps1    # Import PS1 classifier
 from vhl_ps2 import classify_vhl_ps2    # Import PS2 classifier
 
-st.title("VHL/VCEP Classifier (v1.0 TEST) 🧬")
+st.title("VHL/VCEP Classifier (v1.2 TEST) 🧬")
 
 st.markdown(
     """
