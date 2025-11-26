@@ -1,15 +1,15 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 from pathlib import Path
+
 
 st.title("MAVE / SGE summary")
 
 st.markdown(
     """
 This page summarizes [VHL saturation genome editing (SGE/MAVE) data from Findlay et al.](https://www.nature.com/articles/s41588-024-01800-z),
-showing functional scores across the gene, colored by ClinVar-level annotation.
+showing functional scores across the gene, with exon / intron structure annotated along the x-axis.
 """
 )
 
@@ -36,21 +36,31 @@ st.download_button(
 )
 
 
-# --- Choose the coordinate column that runs along the gene ---
-# CHANGE THIS to the correct column name in your CSV if different.
-coord_candidates = ["ref_pos", "cds_pos", "tile_position", "alt_pos"]
-coord_col = next((c for c in coord_candidates if c in df.columns), None)
-
-if coord_col is None:
-    st.error(
-        "No suitable coordinate column found (tried ref_pos, cds_pos, tile_position, alt_pos). "
-        "Please set coord_col to the column that encodes position along VHL."
-    )
+# --- Basic preprocessing for plotting ---
+if "sge_region" not in df.columns:
+    st.error("Column 'sge_region' is required to define exon / intron regions.")
     st.stop()
 
-df = df.sort_values(coord_col).reset_index(drop=True)
-df["genomic_position"] = df[coord_col]
-df["variant_index"] = range(len(df))
+# Order regions in a biologically sensible way: exons then introns.
+# Adjust this list to match your exact labels.
+region_order = [
+    "exon 1a", "exon 1b", "intron 1", "exon 2",
+    "intron 2", "exon 3a", "exon 3b"
+]
+# Fallback: use whatever unique values exist if any are missing.
+present_regions = [r for r in region_order if r in df["sge_region"].unique()]
+if not present_regions:
+    present_regions = list(df["sge_region"].dropna().unique())
+
+df["sge_region"] = pd.Categorical(df["sge_region"], categories=present_regions, ordered=True)
+
+# Sort by region, then by any positional proxy if available
+pos_cols = [c for c in ["ref_pos", "cds_pos", "alt_pos"] if c in df.columns]
+sort_cols = ["sge_region"] + pos_cols
+df = df.sort_values(sort_cols).reset_index(drop=True)
+
+# Dense positional index along gene; this is the x-axis
+df["x_index"] = range(len(df))
 
 
 # --- ClinVar category handling ---
@@ -68,7 +78,7 @@ df["clinvar_simple"] = pd.Categorical(
 )
 
 
-# --- Sidebar controls ---
+# --- Sidebar filters ---
 with st.sidebar:
     st.header("MAVE / SGE filters")
 
@@ -99,54 +109,50 @@ if selected_clinvar:
     mask &= df["clinvar_simple"].isin(selected_clinvar)
 
 df_plot = df[mask].copy()
-
 if df_plot.empty:
     st.warning("No variants match the current filters.")
     st.stop()
 
 
-# --- Infer exon spans from sge_region on the same x-axis ---
-exon_bounds = pd.DataFrame(columns=["region", "min", "max"])
-if "sge_region" in df_plot.columns:
-    tmp = (
-        df_plot.groupby("sge_region")["genomic_position"]
-        .agg(["min", "max"])
-        .reset_index()
-        .rename(columns={"sge_region": "region"})
-    )
-    exon_bounds = tmp[tmp["region"].str.contains("exon", case=False, na=False)]
+# --- Infer exon bands from x_index spans of each region ---
+region_bounds = (
+    df_plot.groupby("sge_region")["x_index"]
+    .agg(["min", "max"])
+    .reset_index()
+    .rename(columns={"sge_region": "region"})
+)
 
 y_min = df_plot["function_score_final"].min()
 y_max = df_plot["function_score_final"].max()
 
 
-# --- Base scatter: x = genomic_position, y = function score ---
+# --- Plot: x = x_index, color by sge_region, ClinVar in hover ---
 fig = px.scatter(
     df_plot,
-    x="genomic_position",
+    x="x_index",
     y="function_score_final",
-    color="clinvar_simple",
+    color="sge_region",
     hover_name=(
         "Preferred Variant Title"
         if "Preferred Variant Title" in df_plot.columns
         else None
     ),
     hover_data={
-        "sge_region": "sge_region" in df_plot.columns,
+        "sge_region": True,
+        "clinvar_simple": True,
         "consequence": "consequence" in df_plot.columns,
         "tier_class": "tier_class" in df_plot.columns,
         "function_score_final": True,
         "rna_score": "rna_score" in df_plot.columns,
-        "genomic_position": True,
-        "variant_index": True,
     },
-    color_discrete_sequence=px.colors.qualitative.Set2,
+    color_discrete_sequence=px.colors.qualitative.Set3,
 )
 
-
-# --- Add exon bands based on inferred bounds ---
+# Add translucent bands for exons only (regions whose name contains 'exon')
 band_colors = px.colors.qualitative.Pastel
-for i, row in exon_bounds.reset_index(drop=True).iterrows():
+for i, row in region_bounds.iterrows():
+    if "exon" not in str(row["region"]).lower():
+        continue
     color = band_colors[i % len(band_colors)]
 
     fig.add_vrect(
@@ -167,17 +173,15 @@ for i, row in exon_bounds.reset_index(drop=True).iterrows():
         yanchor="bottom",
     )
 
-
-# --- Layout & styling ---
 fig.update_yaxes(range=[y_min - 0.2, y_max + 0.6])
 
 fig.update_layout(
     template="plotly_dark",
-    xaxis_title=f"{coord_col} (position along VHL)",
+    xaxis_title="Variant index (ordered by SGE region)",
     yaxis_title="Function score",
-    legend_title="ClinVar annotation",
-    height=600,
-    margin=dict(l=40, r=40, t=80, b=40),
+    legend_title="SGE / exon region",
+    height=650,
+    margin=dict(l=40, r=40, t=90, b=40),
 )
 
 st.plotly_chart(fig, use_container_width=True)
