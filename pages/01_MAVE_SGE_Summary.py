@@ -22,7 +22,6 @@ def load_mave_data(path: Path) -> pd.DataFrame:
     return df
 
 
-# CSV is in project root, one level above `pages/`
 BASE_DIR = Path(__file__).parent.parent
 data_path = BASE_DIR / "Findlay_MAVE_processed.csv"
 df = load_mave_data(data_path)
@@ -37,16 +36,20 @@ st.download_button(
 )
 
 
-# --- Basic preprocessing for plotting ---
-if "alt_pos" not in df.columns:
-    st.error("Column 'alt_pos' is missing from the CSV. Please check the input file.")
+# --- Choose the coordinate column that runs along the gene ---
+# CHANGE THIS to the correct column name in your CSV if different.
+coord_candidates = ["ref_pos", "cds_pos", "tile_position", "alt_pos"]
+coord_col = next((c for c in coord_candidates if c in df.columns), None)
+
+if coord_col is None:
+    st.error(
+        "No suitable coordinate column found (tried ref_pos, cds_pos, tile_position, alt_pos). "
+        "Please set coord_col to the column that encodes position along VHL."
+    )
     st.stop()
 
-# Use alt_pos as genomic coordinate (substitute with ref_pos if preferred)
-df = df.sort_values("alt_pos").reset_index(drop=True)
-df["genomic_position"] = df["alt_pos"]
-
-# Also keep a dense variant index if needed later
+df = df.sort_values(coord_col).reset_index(drop=True)
+df["genomic_position"] = df[coord_col]
 df["variant_index"] = range(len(df))
 
 
@@ -65,23 +68,10 @@ df["clinvar_simple"] = pd.Categorical(
 )
 
 
-# --- Hard-coded exon genomic coordinates (example values, replace with exact VHL exons) ---
-# Coordinates should be in the same coordinate system as alt_pos / genomic_position.
-EXON_COORDS = [
-    {"name": "Exon 1a", "start": 1,    "end": 150},
-    {"name": "Exon 1b", "start": 151,  "end": 300},
-    {"name": "Exon 2",  "start": 301,  "end": 600},
-    {"name": "Exon 3a", "start": 601,  "end": 750},
-    {"name": "Exon 3b", "start": 751,  "end": 900},
-]
-# Replace these with real nucleotide positions for VHL in your SGE design.
-
-
-# --- Sidebar controls (no exon filter now) ---
+# --- Sidebar controls ---
 with st.sidebar:
     st.header("MAVE / SGE filters")
 
-    # Consequence
     consequence_options = (
         sorted(df["consequence"].dropna().unique())
         if "consequence" in df.columns
@@ -93,7 +83,6 @@ with st.sidebar:
         default=consequence_options,
     )
 
-    # ClinVar
     clinvar_options = [c for c in clinvar_order if c in df["clinvar_simple"].unique()]
     selected_clinvar = st.multiselect(
         "ClinVar annotation",
@@ -104,7 +93,6 @@ with st.sidebar:
 
 # --- Apply filters ---
 mask = pd.Series(True, index=df.index)
-
 if selected_consequences:
     mask &= df["consequence"].isin(selected_consequences)
 if selected_clinvar:
@@ -117,7 +105,22 @@ if df_plot.empty:
     st.stop()
 
 
-# --- Base scatter plot: x = genomic position, y = function score ---
+# --- Infer exon spans from sge_region on the same x-axis ---
+exon_bounds = pd.DataFrame(columns=["region", "min", "max"])
+if "sge_region" in df_plot.columns:
+    tmp = (
+        df_plot.groupby("sge_region")["genomic_position"]
+        .agg(["min", "max"])
+        .reset_index()
+        .rename(columns={"sge_region": "region"})
+    )
+    exon_bounds = tmp[tmp["region"].str.contains("exon", case=False, na=False)]
+
+y_min = df_plot["function_score_final"].min()
+y_max = df_plot["function_score_final"].max()
+
+
+# --- Base scatter: x = genomic_position, y = function score ---
 fig = px.scatter(
     df_plot,
     x="genomic_position",
@@ -129,6 +132,7 @@ fig = px.scatter(
         else None
     ),
     hover_data={
+        "sge_region": "sge_region" in df_plot.columns,
         "consequence": "consequence" in df_plot.columns,
         "tier_class": "tier_class" in df_plot.columns,
         "function_score_final": True,
@@ -139,18 +143,15 @@ fig = px.scatter(
     color_discrete_sequence=px.colors.qualitative.Set2,
 )
 
-y_min = df_plot["function_score_final"].min()
-y_max = df_plot["function_score_final"].max()
 
-
-# --- Add exon bands and labels directly on the plot ---
+# --- Add exon bands based on inferred bounds ---
 band_colors = px.colors.qualitative.Pastel
-for i, exon in enumerate(EXON_COORDS):
+for i, row in exon_bounds.reset_index(drop=True).iterrows():
     color = band_colors[i % len(band_colors)]
 
     fig.add_vrect(
-        x0=exon["start"],
-        x1=exon["end"],
+        x0=row["min"],
+        x1=row["max"],
         fillcolor=color,
         opacity=0.18,
         line_width=0,
@@ -158,22 +159,21 @@ for i, exon in enumerate(EXON_COORDS):
     )
 
     fig.add_annotation(
-        x=(exon["start"] + exon["end"]) / 2,
+        x=(row["min"] + row["max"]) / 2,
         y=y_max + 0.2,
-        text=exon["name"],
+        text=row["region"],
         showarrow=False,
         font=dict(size=10, color="#CCCCCC"),
         yanchor="bottom",
     )
 
-# Give some headroom for exon labels
-fig.update_yaxes(range=[y_min - 0.2, y_max + 0.6])
-
 
 # --- Layout & styling ---
+fig.update_yaxes(range=[y_min - 0.2, y_max + 0.6])
+
 fig.update_layout(
     template="plotly_dark",
-    xaxis_title="Genomic position (nucleotide)",
+    xaxis_title=f"{coord_col} (position along VHL)",
     yaxis_title="Function score",
     legend_title="ClinVar annotation",
     height=600,
