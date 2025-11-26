@@ -4,6 +4,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
 
+
+# --- Page config ---
+st.set_page_config(page_title="MAVE/SGE summary", layout="wide")
 st.title("MAVE / SGE summary")
 
 st.markdown(
@@ -41,13 +44,12 @@ st.download_button(
 if "alt_pos" not in df.columns:
     st.error("Column 'alt_pos' is missing from the CSV. Please check the input file.")
     st.stop()
-if "sge_region" not in df.columns:
-    st.error("Column 'sge_region' is missing from the CSV. Needed for exon annotation.")
-    st.stop()
 
-# Sort by genomic position and create dense variant index
+# Use alt_pos as genomic coordinate (substitute with ref_pos if preferred)
 df = df.sort_values("alt_pos").reset_index(drop=True)
 df["genomic_position"] = df["alt_pos"]
+
+# Also keep a dense variant index if needed later
 df["variant_index"] = range(len(df))
 
 
@@ -66,7 +68,19 @@ df["clinvar_simple"] = pd.Categorical(
 )
 
 
-# --- Sidebar controls ---
+# --- Hard-coded exon genomic coordinates (example values, replace with exact VHL exons) ---
+# Coordinates should be in the same coordinate system as alt_pos / genomic_position.
+EXON_COORDS = [
+    {"name": "Exon 1a", "start": 1,    "end": 150},
+    {"name": "Exon 1b", "start": 151,  "end": 300},
+    {"name": "Exon 2",  "start": 301,  "end": 600},
+    {"name": "Exon 3a", "start": 601,  "end": 750},
+    {"name": "Exon 3b", "start": 751,  "end": 900},
+]
+# Replace these with real nucleotide positions for VHL in your SGE design.
+
+
+# --- Sidebar controls (no exon filter now) ---
 with st.sidebar:
     st.header("MAVE / SGE filters")
 
@@ -80,14 +94,6 @@ with st.sidebar:
         "Consequence",
         options=consequence_options,
         default=consequence_options,
-    )
-
-    # SGE region
-    region_options = sorted(df["sge_region"].dropna().unique())
-    selected_regions = st.multiselect(
-        "SGE region",
-        options=region_options,
-        default=region_options,
     )
 
     # ClinVar
@@ -104,8 +110,6 @@ mask = pd.Series(True, index=df.index)
 
 if selected_consequences:
     mask &= df["consequence"].isin(selected_consequences)
-if selected_regions:
-    mask &= df["sge_region"].isin(selected_regions)
 if selected_clinvar:
     mask &= df["clinvar_simple"].isin(selected_clinvar)
 
@@ -116,10 +120,10 @@ if df_plot.empty:
     st.stop()
 
 
-# --- Build base scatter plot (x-axis = variant index) ---
+# --- Base scatter plot: x = genomic position, y = function score ---
 fig = px.scatter(
     df_plot,
-    x="variant_index",
+    x="genomic_position",
     y="function_score_final",
     color="clinvar_simple",
     hover_name=(
@@ -128,7 +132,6 @@ fig = px.scatter(
         else None
     ),
     hover_data={
-        "sge_region": True,
         "consequence": "consequence" in df_plot.columns,
         "tier_class": "tier_class" in df_plot.columns,
         "function_score_final": True,
@@ -139,50 +142,45 @@ fig = px.scatter(
     color_discrete_sequence=px.colors.qualitative.Set2,
 )
 
-# --- Add exon / SGE-region bands on x-axis ---
-region_bounds = (
-    df_plot.groupby("sge_region")["variant_index"]
-    .agg(["min", "max"])
-    .reset_index()
-)
+y_min = df_plot["function_score_final"].min()
+y_max = df_plot["function_score_final"].max()
 
-exon_colors = px.colors.qualitative.Pastel
-for i, row in region_bounds.iterrows():
-    color = exon_colors[i % len(exon_colors)]
-    # translucent vertical rectangle
+
+# --- Add exon bands and labels directly on the plot ---
+band_colors = px.colors.qualitative.Pastel
+for i, exon in enumerate(EXON_COORDS):
+    color = band_colors[i % len(band_colors)]
+
     fig.add_vrect(
-        x0=row["min"],
-        x1=row["max"],
+        x0=exon["start"],
+        x1=exon["end"],
         fillcolor=color,
         opacity=0.18,
         line_width=0,
         layer="below",
     )
-    # exon label at top of band
+
     fig.add_annotation(
-        x=(row["min"] + row["max"]) / 2,
-        y=df_plot["function_score_final"].max() + 0.2,
-        text=row["sge_region"],
+        x=(exon["start"] + exon["end"]) / 2,
+        y=y_max + 0.2,
+        text=exon["name"],
         showarrow=False,
         font=dict(size=10, color="#CCCCCC"),
         yanchor="bottom",
     )
 
+# Give some headroom for exon labels
+fig.update_yaxes(range=[y_min - 0.2, y_max + 0.6])
 
-# --- Layout tweaks for a cleaner, wider look ---
+
+# --- Layout & styling ---
 fig.update_layout(
     template="plotly_dark",
-    xaxis_title="Variant index",
+    xaxis_title="Genomic position (nucleotide)",
     yaxis_title="Function score",
     legend_title="ClinVar annotation",
     height=600,
     margin=dict(l=40, r=40, t=80, b=40),
 )
-
-# Slight extra headroom for exon labels
-fig.update_yaxes(range=[
-    df_plot["function_score_final"].min() - 0.2,
-    df_plot["function_score_final"].max() + 0.6,
-])
 
 st.plotly_chart(fig, use_container_width=True)
