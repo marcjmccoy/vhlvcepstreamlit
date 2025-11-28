@@ -75,6 +75,7 @@ def build_example_variants_df() -> pd.DataFrame:
                 "NM_000551.4(VHL):c.120_122del (p.Val41del)",
                 "NM_000551.4(VHL):c.190_195dup (p.Lys64_Leu65dup)",
                 "NM_000551.4(VHL):c.263G>A (p.Trp88Ter)",
+                "NM_000551.4(VHL):c.189_191del",
             ],
             "Rationale": [
                 "Canonical +1 donor splice change expected to abolish splicing in a loss-of-function VHL gene.",
@@ -87,6 +88,7 @@ def build_example_variants_df() -> pd.DataFrame:
                 "Three-base in-frame deletion removing one conserved residue.",
                 "In-frame tandem duplication adding two residues without a frameshift.",
                 "Nonsense variant introducing a premature stop in the central part of VHL.",
+                "In-frame deletion that removes codon 63, which lies within the critical beta domain (AA 63–155) of pVHL"
             ],
         }
     )
@@ -316,7 +318,7 @@ if hgvs_input:
     st.write(ps1_result)
 
     st.subheader("PS2")
-    st.write(ps2_result)
+st.write(ps2_result)
 
     st.subheader("PM4")
     st.write(pm4_result)
