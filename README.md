@@ -1,8 +1,8 @@
-## VHL/VCEP Classifier
+## Semantically Enriched VHL/VCEP Classifier
 
 ### Overview
 
-VHL/VCEP Classifier is an ML/AI‑powered, gene‑centric decision‑support application explicitly designed as a guideline‑forming intelligence system for Von Hippel–Lindau (VHL) variant interpretation. It operationalizes the ClinGen VHL Variant Curation Expert Panel (VCEP) gene‑ and disease‑specific ACMG/AMP specifications to deliver transparent, standards‑compliant classifications of VHL variants, combining a rules‑based implementation of VHL‑tailored criteria with multiplexed functional readouts from saturation genome editing / MAVE experiments to generate consistent, reproducible provisional classifications across the VHL coding region while exposing the full evidence stack for expert review and methods development.
+VHL/VCEP Classifier is an ML/AI‑powered, gene‑centric decision‑support LLM application explicitly designed as a guideline‑forming intelligence system for Von Hippel–Lindau (VHL) variant interpretation. It operationalizes the ClinGen VHL Variant Curation Expert Panel (VCEP) gene‑ and disease‑specific ACMG/AMP specifications to deliver transparent, standards‑compliant classifications of VHL variants, combining a rules‑based implementation of VHL‑tailored criteria with multiplexed functional readouts from saturation genome editing / MAVE experiments to generate consistent, reproducible provisional classifications across the VHL coding region while exposing the full evidence stack for expert review and methods development.
 
 ### Academic Rationale and Ground Truth
 
