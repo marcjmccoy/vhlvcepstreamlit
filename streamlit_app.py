@@ -4,6 +4,7 @@ import pandas as pd
 from vhl_pvs1 import classify_vhl_pvs1
 from vhl_ps1 import classify_vhl_ps1
 from vhl_ps2 import classify_vhl_ps2
+from vhl_pm4 import classify_vhl_pm4
 
 
 # ---------------- Page config ----------------
@@ -285,12 +286,16 @@ def run_classifiers(
         family_history=family_history,
     )
 
-    return pvs1_result, ps1_result, ps2_result
+    # PM4
+    pm4_result = classify_vhl_pm4(
+        hgvs
+    )
 
+    return pvs1_result, ps1_result, ps2_result, pm4_result
 
 # ---------------- Trigger classification ----------------
 if hgvs_input:
-    pvs1_result, ps1_result, ps2_result = run_classifiers(
+    pvs1_result, ps1_result, ps2_result, pm4_result = run_classifiers(
         hgvs_input,
         exon_skipping=exon_skipping,
         cryptic_disrupts_rf=cryptic_disrupts_rf,
@@ -312,3 +317,6 @@ if hgvs_input:
 
     st.subheader("PS2")
     st.write(ps2_result)
+
+    st.subheader("PM4")
+    st.write(pm4_result)
