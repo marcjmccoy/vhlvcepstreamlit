@@ -88,7 +88,7 @@ def build_example_variants_df() -> pd.DataFrame:
                 "Three-base in-frame deletion removing one conserved residue.",
                 "In-frame tandem duplication adding two residues without a frameshift.",
                 "Nonsense variant introducing a premature stop in the central part of VHL.",
-                "In-frame deletion that removes codon 63, which lies within the critical beta domain (AA 63–155) of pVHL"
+                "in-frame deletion that removes codon 63, which lies within the critical beta domain (AA 63–155) of pVHL",
             ],
         }
     )
