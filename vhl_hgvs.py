@@ -18,7 +18,7 @@ def parse_vhl_hgvs(hgvs_full: str):
     if not isinstance(hgvs_full, str):
         return None, None, None
 
-    # Transcript (strip optional '(VHL)').
+    # Transcript, allowing optional '(VHL)'.
     m_tx = re.match(r"^([A-Z0-9_.]+)\(VHL\)", hgvs_full)
     if not m_tx:
         m_tx = re.match(r"^([A-Z0-9_.]+):", hgvs_full)
@@ -33,3 +33,12 @@ def parse_vhl_hgvs(hgvs_full: str):
     protein = f"p.{m_p.group(1)}" if m_p else None
 
     return transcript, cdna, protein
+
+
+def format_vhl_hgvs(transcript: str, cdna: str) -> str:
+    """
+    Build a display HGVS including '(VHL)' as in user input.
+    """
+    if not transcript or not cdna:
+        return ""
+    return f"{transcript}(VHL):{cdna}"

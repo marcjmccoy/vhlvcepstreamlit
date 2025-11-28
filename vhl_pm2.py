@@ -2,16 +2,12 @@
 
 """
 VHL VCEP PM2_Supporting classifier (gnomAD v4 via ClinGen LDH).
-
-Implements GN078 PM2_Supporting using GroupMax Filtering Allele Frequency (FAF)
-from gnomAD v4 accessed through ClinGen LDH, resolving variants via
-the ClinGen Allele Registry CA ID.
 """
 
 import logging
 import requests
 
-from vhl_hgvs import parse_vhl_hgvs
+from vhl_hgvs import parse_vhl_hgvs, format_vhl_hgvs
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +109,11 @@ def _query_clingen_gnomad_v4_with_ca(ca_id: str):
 def classify_vhl_pm2(hgvs_full: str):
     """
     VHL VCEP PM2_Supporting classifier using gnomAD v4 via ClinGen LDH.
+
+    Only applies PM2 when:
+      - gnomAD v4 explicitly shows absence; or
+      - GroupMax FAF ≤ GNOMAD_PM2_MAX_FAF; or
+      - Present but no FAF computed.
     """
     transcript, cdna, _ = parse_vhl_hgvs(hgvs_full)
 
@@ -127,18 +128,18 @@ def classify_vhl_pm2(hgvs_full: str):
             "groupmax_faf": None,
         }
 
-    # IMPORTANT: build a registry‑compatible HGVS (no '(VHL)' tag).
-    full_hgvs = f"{transcript}:{cdna}"
+    display_hgvs = format_vhl_hgvs(transcript, cdna)  # NM_000551.4(VHL):c.1A>T
+    registry_hgvs = f"{transcript}:{cdna}"           # NM_000551.4:c.1A>T
 
-    ca_id = _get_ca_id_from_hgvs(full_hgvs)
+    ca_id = _get_ca_id_from_hgvs(registry_hgvs)
     if ca_id is None:
-        logger.info("No CA ID for %s; treating as no population data.", full_hgvs)
+        logger.info("No CA ID for %s; cannot assess PM2.", registry_hgvs)
         return {
-            "strength": "PM2_Supporting",
+            "strength": None,
             "context": (
-                f"{full_hgvs} could not be resolved to a ClinGen CA ID; "
-                "treating as absent from population datasets and applying "
-                "PM2_Supporting conservatively."
+                f"{display_hgvs} could not be resolved to a ClinGen CA ID; "
+                "no reliable gnomAD v4 population data, so PM2_Supporting "
+                "is not applied."
             ),
             "present_in_gnomad": False,
             "groupmax_faf": None,
@@ -150,7 +151,7 @@ def classify_vhl_pm2(hgvs_full: str):
         return {
             "strength": "PM2_Supporting",
             "context": (
-                f"{full_hgvs} (CA ID {ca_id}) is absent from gnomAD v4 "
+                f"{display_hgvs} (CA ID {ca_id}) is absent from gnomAD v4 "
                 "(no alternate alleles observed), meeting the "
                 "PM2_Supporting population criterion."
             ),
@@ -162,7 +163,7 @@ def classify_vhl_pm2(hgvs_full: str):
         return {
             "strength": "PM2_Supporting",
             "context": (
-                f"{full_hgvs} (CA ID {ca_id}) is present in gnomAD v4 with "
+                f"{display_hgvs} (CA ID {ca_id}) is present in gnomAD v4 with "
                 f"GroupMax FAF={faf:.3e}, which is ≤1.56×10⁻⁶, so "
                 "PM2_Supporting is applicable."
             ),
@@ -174,7 +175,7 @@ def classify_vhl_pm2(hgvs_full: str):
         return {
             "strength": "PM2_Supporting",
             "context": (
-                f"{full_hgvs} (CA ID {ca_id}) is observed in gnomAD v4 but lacks "
+                f"{display_hgvs} (CA ID {ca_id}) is observed in gnomAD v4 but lacks "
                 "a GroupMax FAF estimate (likely a single‑allele site); this "
                 "still qualifies for PM2_Supporting."
             ),
@@ -185,7 +186,7 @@ def classify_vhl_pm2(hgvs_full: str):
     return {
         "strength": None,
         "context": (
-            f"{full_hgvs} (CA ID {ca_id}) has GroupMax FAF={faf:.3e} in gnomAD v4, "
+            f"{display_hgvs} (CA ID {ca_id}) has GroupMax FAF={faf:.3e} in gnomAD v4, "
             "which exceeds the PM2_Supporting cutoff of 1.56×10⁻⁶; "
             "PM2_Supporting not applied."
         ),
