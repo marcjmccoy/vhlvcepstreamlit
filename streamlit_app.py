@@ -318,7 +318,7 @@ if hgvs_input:
     st.write(ps1_result)
 
     st.subheader("PS2")
-st.write(ps2_result)
+    st.write(ps2_result)
 
     st.subheader("PM4")
     st.write(pm4_result)
