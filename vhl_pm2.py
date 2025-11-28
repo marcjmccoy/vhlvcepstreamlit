@@ -1,3 +1,5 @@
+# vhl_pm2.py
+
 """
 VHL VCEP PM2_Supporting classifier (gnomAD v4 via ClinGen LDH).
 
@@ -44,7 +46,7 @@ def _get_ca_id_from_hgvs(hgvs: str):
     Resolve an HGVS string to a ClinGen CA ID via the Allele Registry.
 
     Returns:
-        e.g. 'CA123456789' or None if not found / error.
+        'CA123456789' or None if not found / error.
     """
     try:
         resp = requests.get(
@@ -58,7 +60,6 @@ def _get_ca_id_from_hgvs(hgvs: str):
         logger.warning("Allele Registry lookup failed for %s: %s", hgvs, exc)
         return None
 
-    # Registry can return dict keyed by CA or list of allele objects.
     if isinstance(data, dict):
         ca_keys = [k for k in data.keys() if isinstance(k, str) and k.startswith("CA")]
         return ca_keys[0] if ca_keys else None
@@ -94,7 +95,6 @@ def _query_clingen_gnomad_v4_with_ca(ca_id: str):
         logger.warning("LDH allele lookup failed for %s: %s", ca_id, exc)
         return False, None
 
-    # GroupMax FAF field variants.
     faf_raw = (
         doc.get("jointGrpMaxFAF95")
         or doc.get("grpmaxFAF")
@@ -113,11 +113,6 @@ def _query_clingen_gnomad_v4_with_ca(ca_id: str):
 def classify_vhl_pm2(hgvs_full: str):
     """
     VHL VCEP PM2_Supporting classifier using gnomAD v4 via ClinGen LDH.
-
-    PM2_Supporting is applied when:
-      - The variant is absent from gnomAD v4; OR
-      - The variant has GroupMax FAF ≤ GNOMAD_PM2_MAX_FAF; OR
-      - The variant is present but has no GroupMax FAF calculated.
     """
     transcript, cdna, _ = parse_vhl_hgvs(hgvs_full)
 
@@ -132,9 +127,9 @@ def classify_vhl_pm2(hgvs_full: str):
             "groupmax_faf": None,
         }
 
+    # IMPORTANT: build a registry‑compatible HGVS (no '(VHL)' tag).
     full_hgvs = f"{transcript}:{cdna}"
 
-    # Step 1: resolve to CA ID.
     ca_id = _get_ca_id_from_hgvs(full_hgvs)
     if ca_id is None:
         logger.info("No CA ID for %s; treating as no population data.", full_hgvs)
@@ -149,10 +144,8 @@ def classify_vhl_pm2(hgvs_full: str):
             "groupmax_faf": None,
         }
 
-    # Step 2: query LDH for gnomAD v4 by CA ID.
     present, faf = _query_clingen_gnomad_v4_with_ca(ca_id)
 
-    # 1) Absent from gnomAD v4.
     if not present:
         return {
             "strength": "PM2_Supporting",
@@ -165,7 +158,6 @@ def classify_vhl_pm2(hgvs_full: str):
             "groupmax_faf": None,
         }
 
-    # 2) Present with GroupMax FAF at or below threshold.
     if faf is not None and faf <= GNOMAD_PM2_MAX_FAF:
         return {
             "strength": "PM2_Supporting",
@@ -178,7 +170,6 @@ def classify_vhl_pm2(hgvs_full: str):
             "groupmax_faf": faf,
         }
 
-    # 3) Present but no GroupMax FAF computed.
     if present and faf is None:
         return {
             "strength": "PM2_Supporting",
@@ -191,7 +182,6 @@ def classify_vhl_pm2(hgvs_full: str):
             "groupmax_faf": None,
         }
 
-    # 4) FAF above the threshold – PM2_Supporting not met.
     return {
         "strength": None,
         "context": (
