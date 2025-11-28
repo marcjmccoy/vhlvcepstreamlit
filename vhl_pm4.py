@@ -2,49 +2,68 @@ import re
 
 
 ######################### VHL CONSTANTS #######################################
-#TODO eventually need to productionize and make constants OOP call
 
 # Exon boundaries for NM_000551.4 (VHL); adjust if transcript changes
 VHL_EXON_BOUNDS = [
-    (1, 340),    # Exon 1: c.1 - c.340 [web:22]
-    (341, 463),  # Exon 2: c.341 - c.463 [web:24]
-    (464, 642)   # Exon 3: c.464 - c.642 [web:21][web:25]
+    (1, 340),    # Exon 1: c.1 - c.340
+    (341, 463),  # Exon 2: c.341 - c.463
+    (464, 642)   # Exon 3: c.464 - c.642
 ]
 
 # Functional domains for canonical pVHL213 as per GN078:
-# Beta (β) domain (AA 63–155, Nuclear Export),
-# Alpha (ɑ) domain (AA 156–192, Elongin C binding),
-# Second Beta (β) domain (AA 193–204). [web:1][web:2][web:29]
+# Beta (β) domain (AA 63–155), Alpha (ɑ) domain (AA 156–192),
+# Second Beta (β) domain (AA 193–204)
 CRITICAL_DOMAINS = [
     (63, 155),   # 1st beta domain
     (156, 192),  # alpha domain
     (193, 204)   # 2nd beta domain
 ]
 
-C_TERM = (205, 213)  # C-terminal tail of pVHL213
-
-VHL_PROTEIN_LENGTH = 213  # AA length of canonical pVHL213
+C_TERM = (205, 213)          # C-terminal tail of pVHL213
+VHL_PROTEIN_LENGTH = 213     # AA length of canonical pVHL213
 
 
 ######################### cDNA-LEVEL HELPERS ##################################
 
-def parse_cdna(hgvs):
+
+def parse_cdna_interval_and_op(hgvs):
     """
-    Extract cDNA start/end positions from an HGVS string like:
-        'NM_000551.4(VHL):c.191G>C' or '...:c.191_193del'
+    Parse cDNA interval and operation from a c.HGVS string, e.g.:
+        NM_000551.4(VHL):c.189_191del
+        NM_000551.4(VHL):c.190_195dup
+        NM_000551.4(VHL):c.190_195delinsTGC
+        NM_000551.4(VHL):c.191G>C
+
     Returns:
-        (cdna_start, cdna_end) as ints or (None, None) on failure.
+        dict with keys:
+            'start': int or None
+            'end': int or None
+            'op': one of ['del', 'dup', 'ins', 'delins', 'sub', None]
+            'op_seq': optional inserted sequence string (for dup/ins/delins)
     """
-    m = re.search(r"c\.(\d+)(?:_(\d+))?", hgvs)
-    if m:
-        start = int(m.group(1))
-        end = int(m.group(2)) if m.group(2) else start
-        return start, end
-    m_single = re.search(r"c\.(\d+)", hgvs)
-    if m_single:
-        pos = int(m_single.group(1))
-        return pos, pos
-    return None, None
+    # Generic cDNA pattern capturing interval and op
+    m = re.search(
+        r"c\.(\d+)(?:_(\d+))?"
+        r"(?:(delins|del|dup|ins)|([ACGT]>[ACGT]))?"
+        r"([ACGT]*)?",
+        hgvs
+    )
+    if not m:
+        return {"start": None, "end": None, "op": None, "op_seq": None}
+
+    start = int(m.group(1))
+    end = int(m.group(2)) if m.group(2) else start
+
+    op = None
+    op_seq = None
+
+    if m.group(3):  # delins / del / dup / ins
+        op = m.group(3)
+        op_seq = m.group(5) if m.group(5) else None
+    elif m.group(4):  # substitution, like 191G>C
+        op = "sub"
+
+    return {"start": start, "end": end, "op": op, "op_seq": op_seq}
 
 
 def cdna_to_codon(cdna_pos):
@@ -61,19 +80,15 @@ def in_critical_domain(codon):
     return any(start <= codon <= end for start, end in CRITICAL_DOMAINS)
 
 
-def in_cterm(codon):
+def entirely_before_54(start_aa, end_aa):
     """
-    True if codon lies in the C-terminal tail (AA 205–213).
+    Returns True if the entire affected AA interval is <54.
+    PM4 does not apply to in-frame indels prior to codon 54 that
+    do not alter the Met54 VHL p19 codon and beyond.
     """
-    return codon is not None and 205 <= codon <= 213
-
-
-def predict_nmd(codon):
-    """
-    Very simple VHL-specific NMD heuristic: treat nonsense around codons
-    55–136 as likely to trigger NMD (approximate midcoding region). [web:2][web:42]
-    """
-    return codon is not None and 55 <= codon <= 136
+    if start_aa is None or end_aa is None:
+        return False
+    return end_aa < 54
 
 
 def is_exon_boundary(cdna_start, cdna_end):
@@ -89,71 +104,67 @@ def is_exon_boundary(cdna_start, cdna_end):
     return False
 
 
-######################### PROTEIN-LEVEL PARSING ###############################
+######################### cDNA → PROTEIN INFERENCE ############################
 
-def parse_protein_change(hgvs_protein):
+
+def infer_inframe_type_from_cdna(cdna_info):
     """
-    Parse the protein-level HGVS fragment from a full HGVS string like:
-        'NM_000551.4(VHL):c.191G>C (p.Arg64Pro)'
+    Given parsed cDNA info (start, end, op, op_seq), infer whether the variant
+    is an in-frame deletion/insertion/indel affecting coding sequence.
 
     Returns:
-        dict with keys:
-            'type': one of ['missense', 'inframe_del', 'inframe_ins',
-                            'inframe_indel', 'stop_loss', 'other']
-            'start_aa': int or None (first affected AA, 1-based)
-            'end_aa': int or None (last affected AA, 1-based)
+        ('inframe_del' | 'inframe_ins' | 'inframe_indel' | 'other')
     """
-    m = re.search(r"\((p\.[^)]+)\)", hgvs_protein)
-    if not m:
-        return {"type": "other", "start_aa": None, "end_aa": None}
-    p = m.group(1)
+    start = cdna_info["start"]
+    end = cdna_info["end"]
+    op = cdna_info["op"]
+    op_seq = cdna_info["op_seq"]
 
-    # Simple missense / synonymous / nonsense etc: p.Arg64Pro, p.Arg64=
-    missense_like = re.match(r"p\.([A-Z*])(\d+)([A-Z*]|=)", p)
-    if missense_like:
-        aa_pos = int(missense_like.group(2))
-        # Identify stop-loss: original is stop, new is not stop
-        if missense_like.group(1) == "*" and missense_like.group(3) != "*":
-            return {"type": "stop_loss", "start_aa": aa_pos, "end_aa": aa_pos}
-        return {"type": "missense", "start_aa": aa_pos, "end_aa": aa_pos}
+    if start is None or end is None or op is None:
+        return "other"
 
-    # In-frame deletion: p.Lys171del or p.Lys171_Glu173del
-    del_match = re.match(r"p\.([A-Z*])(\d+)(?:_([A-Z*])(\d+))?del", p)
-    if del_match:
-        start = int(del_match.group(2))
-        end = int(del_match.group(4)) if del_match.group(4) else start
-        return {"type": "inframe_del", "start_aa": start, "end_aa": end}
+    length = end - start + 1
 
-    # In-frame insertion: p.Lys171_Glu172insGly or p.Lys171_Glu172insGlyVal
-    ins_match = re.match(r"p\.([A-Z*])(\d+)_([A-Z*])(\d+)ins", p)
-    if ins_match:
-        start = int(ins_match.group(2))
-        end = int(ins_match.group(4))
-        # A pure insertion is between start and end; treat as affecting that interval
-        return {"type": "inframe_ins", "start_aa": start, "end_aa": end}
+    # Deletions
+    if op == "del":
+        return "inframe_del" if length % 3 == 0 else "other"
 
-    # In-frame indel (delins) explicitly marked as in-frame:
-    # e.g., p.Lys171_Glu173delinsAsnVal (CDS multiple of 3)
-    indel_match = re.match(r"p\.([A-Z*])(\d+)_([A-Z*])(\d+)delins", p)
-    if indel_match:
-        start = int(indel_match.group(2))
-        end = int(indel_match.group(4))
-        return {"type": "inframe_indel", "start_aa": start, "end_aa": end}
+    # Duplications: assume length equals duplicated inserted length
+    if op == "dup":
+        return "inframe_ins" if length % 3 == 0 else "other"
 
-    # Stop-loss explicit with extension length, e.g. p.*214Leuext*?
-    stop_loss_match = re.match(r"p\.\*?(\d+)[A-Z]+ext\*?", p)
-    if stop_loss_match:
-        start = int(stop_loss_match.group(1))
-        return {"type": "stop_loss", "start_aa": start, "end_aa": start}
+    # Pure insertions (between nucleotides)
+    if op == "ins":
+        ins_len = len(op_seq) if op_seq else 0
+        return "inframe_ins" if ins_len % 3 == 0 and ins_len > 0 else "other"
 
-    # Fallback
-    return {"type": "other", "start_aa": None, "end_aa": None}
+    # Delins: need net effect on CDS length to be multiple of 3
+    if op == "delins":
+        del_len = length
+        ins_len = len(op_seq) if op_seq else 0
+        net = ins_len - del_len
+        return "inframe_indel" if net % 3 == 0 else "other"
+
+    # Substitutions are not PM4-relevant here
+    return "other"
+
+
+def cdna_interval_to_codon_interval(cdna_start, cdna_end):
+    """
+    Map a cDNA interval to the corresponding codon interval.
+    For multi-nucleotide events, this gives the minimal codon span.
+    """
+    if cdna_start is None or cdna_end is None:
+        return None, None
+    aa_start = cdna_to_codon(cdna_start)
+    aa_end = cdna_to_codon(cdna_end)
+    return aa_start, aa_end
 
 
 def affects_beta_alpha_domains(start_aa, end_aa):
     """
     Returns True if the in-frame change overlaps the B/alpha/second-B domains
-    (AA 63–204) as defined in GN078. [web:1][web:2]
+    (AA 63–204) as defined in GN078.
     """
     if start_aa is None or end_aa is None:
         return False
@@ -161,59 +172,67 @@ def affects_beta_alpha_domains(start_aa, end_aa):
     return not (end_aa < dom_start or start_aa > dom_end)
 
 
-def entirely_before_54(start_aa, end_aa):
-    """
-    Returns True if the entire affected AA interval is <54.
-    PM4 does not apply to in-frame indels prior to codon 54 that
-    do not alter the Met54 VHL p19 codon and beyond. [web:2]
-    """
-    if start_aa is None or end_aa is None:
-        return False
-    return end_aa < 54
-
-
 ############################# PM4 CLASSIFIER ##################################
+
 
 def classify_vhl_pm4(hgvs_str):
     """
-    Implement VHL-specific PM4 per GN078:
+    Implement VHL-specific PM4 per GN078 using cDNA-only HGVS.
 
       - Moderate strength when:
           * In-frame insertion/deletion/indel in the B and alpha domains
             (AA 63–204; beta, alpha, second beta domains), OR
           * Stop-loss variant that adds significant additional amino acids
-            beyond the canonical stop codon of VHL. [web:2][web:34]
+            beyond the canonical stop codon of VHL.
 
       - PM4 does NOT apply to in-frame indels prior to codon 54 that do not
-        alter the Met54 VHL p19 codon and beyond. [web:2]
+        alter the Met54 VHL p19 codon and beyond.
 
-    Returns:
-        dict: {"strength": <str or None>, "context": <str>}
+    Expects an input like:
+        'NM_000551.4(VHL):c.189_191del'
+        'NM_000551.4(VHL):c.190_195dup'
     """
 
-    # Extract and parse protein-level HGVS
-    prot_info = parse_protein_change(hgvs_str)
-    vt = prot_info["type"]
-    start_aa = prot_info["start_aa"]
-    end_aa = prot_info["end_aa"]
+    # 1) Parse cDNA and operation
+    cdna_info = parse_cdna_interval_and_op(hgvs_str)
+    cdna_start = cdna_info["start"]
+    cdna_end = cdna_info["end"]
 
-    # If cannot parse, do not apply PM4
-    if vt == "other" or start_aa is None:
+    if cdna_start is None or cdna_end is None:
         return {
             "strength": None,
-            "context": "Unable to confidently parse protein-level change; PM4 not applied for VHL."
+            "context": "Unable to parse cDNA interval; PM4 not applied for VHL."
         }
 
-    # Exclude events fully prior to codon 54 and not touching/altering Met54+
-    if entirely_before_54(start_aa, end_aa):
+    # 2) Infer in-frame type from cDNA
+    vt = infer_inframe_type_from_cdna(cdna_info)
+
+    # Handle stop-loss separately if you later extend this to support p. notation.
+    if vt == "other":
+        return {
+            "strength": None,
+            "context": "Variant is not an in-frame indel at the cDNA level; VHL PM4 not applied."
+        }
+
+    # 3) Convert cDNA interval to codon interval
+    aa_start, aa_end = cdna_interval_to_codon_interval(cdna_start, cdna_end)
+
+    if aa_start is None or aa_end is None:
+        return {
+            "strength": None,
+            "context": "Unable to map cDNA interval to codons; PM4 not applied for VHL."
+        }
+
+    # 4) Exclude events fully prior to codon 54
+    if entirely_before_54(aa_start, aa_end):
         return {
             "strength": None,
             "context": "In-frame change entirely prior to codon 54 and not affecting Met54 or beyond; VHL PM4 not applied."
         }
 
-    # In-frame indels in B / alpha / second-B domains (AA 63–204)
+    # 5) In-frame indels in B / alpha / second-B domains (AA 63–204)
     if vt in ["inframe_del", "inframe_ins", "inframe_indel"]:
-        if affects_beta_alpha_domains(start_aa, end_aa):
+        if affects_beta_alpha_domains(aa_start, aa_end):
             return {
                 "strength": "PM4",
                 "context": "In-frame insertion/deletion within VHL beta/alpha domains (AA 63–204); assign PM4 (Moderate)."
@@ -224,27 +243,8 @@ def classify_vhl_pm4(hgvs_str):
                 "context": "In-frame insertion/deletion outside VHL beta/alpha domains (AA 63–204); VHL PM4 not applied."
             }
 
-    # Stop-loss variants adding significant additional amino acids
-    if vt == "stop_loss":
-        # GN078 emphasizes “significant” C-terminal extension, citing multiple
-        # pathogenic cases and functional data, but does not specify an exact
-        # numeric cutoff. [web:2]
-        # Here, treat any well-defined extension beyond the canonical stop
-        # that creates a new tail (start_aa > VHL_PROTEIN_LENGTH) as qualifying
-        # for PM4, leaving finer downgrading to other criteria if needed.
-        if start_aa > VHL_PROTEIN_LENGTH:
-            return {
-                "strength": "PM4",
-                "context": "Stop-loss variant adding a C-terminal extension beyond VHL codon 213; assign PM4 (Moderate)."
-            }
-        else:
-            return {
-                "strength": None,
-                "context": "Stop-loss extension cannot be confidently interpreted as adding a significant C-terminal tail; VHL PM4 not applied."
-            }
-
-    # Missense, synonymous, frameshift, early nonsense, etc. – PM4 not relevant
+    # Fallback
     return {
         "strength": None,
-        "context": "Variant type is not an in-frame indel in AA 63–204 or a qualifying stop-loss extension; VHL PM4 not applied."
+        "context": "Variant type is not an in-frame indel in AA 63–204; VHL PM4 not applied."
     }
