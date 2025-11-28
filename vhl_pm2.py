@@ -1,19 +1,18 @@
 """
 VHL VCEP PM2_Supporting classifier.
 
-Implements the VHL VCEP rule using gnomAD v4 on GRCh38:
-
-- PM2_Supporting can be applied for variants either absent from gnomAD or
-  with <= 0.00000156 (0.000156%) GroupMax Filtering Allele Frequency
-  (GroupMax FAF) in gnomAD v4.
-- If no GroupMax FAF is calculated (e.g. single observation), PM2_Supporting
-  may also be applied.
-
 Workflow:
   1) Parse VHL transcript HGVS input, e.g. 'NM_000551.4(VHL):c.1A>T (p.Met1Leu)'.
-  2) Use MyVariant.info to map NM_000551.4:c.* to GRCh38 genomic coords.
+  2) Use Ensembl VEP REST API to map NM_000551.4:c.* to GRCh38 genomic coords.
   3) Query gnomAD v4 REST API for that locus (chrom-pos-ref-alt).
-  4) Apply the PM2_Supporting rule.
+  4) Apply the VHL VCEP PM2_Supporting rule.
+
+VHL VCEP rule (GN078):
+- PM2_Supporting can be applied for variants either absent from gnomAD or
+  with <= 0.00000156 (0.000156%) GroupMax Filtering Allele Frequency (FAF)
+  in gnomAD v4.
+- If no GroupMax FAF is calculated (e.g., single observation), PM2_Supporting
+  may also be applied.
 """
 
 import re
@@ -22,14 +21,36 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# VHL VCEP PM2_Supporting GroupMax FAF threshold (gnomAD v4)
 GNOMAD_PM2_MAX_FAF: float = 0.00000156  # 0.000156%
 
-# MyVariant.info base URL
-MYVARIANT_BASE = "https://myvariant.info/v1"
+# Ensembl VEP REST (GRCh38 by default when no 'content-type' override).
+VEP_HGVS_BASE = "https://rest.ensembl.org/vep/human/hgvs"
 
 # gnomAD REST “variant” endpoint (v4 / GRCh38, external API)
 GNOMAD_VARIANT_BASE = "https://gnomad.broadinstitute.org/api/variant"
+
+
+# ----------------------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------------------
+
+
+def _safe_float(value):
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(value, default=0):
+    try:
+        if value is None:
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 # ----------------------------------------------------------------------
@@ -62,81 +83,61 @@ def _parse_vhl_hgvs(hgvs_full: str):
 
 
 # ----------------------------------------------------------------------
-# Helpers
+# Ensembl VEP: transcript HGVS -> GRCh38 genomic coords
 # ----------------------------------------------------------------------
 
 
-def _safe_float(value):
-    try:
-        if value is None:
-            return None
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _safe_int(value, default=0):
-    try:
-        if value is None:
-            return default
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-# ----------------------------------------------------------------------
-# MyVariant: c.HGVS -> GRCh38 genomic coords
-# ----------------------------------------------------------------------
-
-
-def _get_grch38_coords_from_cdna(hgvs_tx: str):
+def _vep_map_hgvs_to_grch38(hgvs_tx: str):
     """
-    Use MyVariant.info to map a transcript HGVS (NM_000551.4:c.*)
-    to GRCh38 genomic coordinates: chrom, pos (1-based), ref, alt.
-
-    Strategy:
-      - Query across multiple scopes: clinvar.hgvs.coding, refseq.transcript, hgvs.
-      - Use hg38.start, hg38.ref, hg38.alt directly.
+    Use Ensembl VEP REST API to map a transcript HGVS
+    (e.g. 'NM_000551.4:c.160A>T') to GRCh38 chrom, pos, ref, alt.
 
     Returns:
-        chrom (str), pos (int), ref (str), alt (str) or (None, None, None, None).
+        chrom (str), pos (int), ref (str), alt (str)
+        or (None, None, None, None) on failure.
     """
+    url = f"{VEP_HGVS_BASE}/{hgvs_tx}"
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+
     try:
         resp = requests.get(
-            f"{MYVARIANT_BASE}/query",
-            params={
-                "q": hgvs_tx,
-                "scopes": "clinvar.hgvs.coding,refseq.transcript,hgvs",
-                "fields": "hg38",
-                "assembly": "hg38",
-                "size": 1,
-            },
+            url,
+            params={"refseq": 1},  # prefer RefSeq transcript mappings
+            headers=headers,
             timeout=10,
         )
+        if resp.status_code == 404:
+            return None, None, None, None
         resp.raise_for_status()
-        data = resp.json() or {}
+        data = resp.json() or []
     except Exception as exc:
-        logger.warning("MyVariant hg38 mapping failed for %s: %s", hgvs_tx, exc)
+        logger.warning("VEP hgvs->GRCh38 mapping failed for %s: %s", hgvs_tx, exc)
         return None, None, None, None
 
-    hits = data.get("hits") or []
-    if not hits:
+    if not data:
         return None, None, None, None
 
-    hg38_block = hits[0].get("hg38") or {}
-    chrom = str(hg38_block.get("chrom") or "").replace("chr", "")
-    start = hg38_block.get("start")
-    end = hg38_block.get("end")
-    ref = hg38_block.get("ref")
-    alt = hg38_block.get("alt")
+    # Take the first transcript consequence.
+    entry = data[0]
+    colocated = (entry.get("colocated_variants") or [])
+    if colocated:
+        # Prefer colocated variant genomic fields when present.
+        var = colocated[0]
+        chrom = str(var.get("seq_region_name") or "")
+        pos = var.get("start")
+        ref = var.get("allele_string", "").split("/")[0] or None
+        alt = var.get("allele_string", "").split("/")[1] if "/" in var.get("allele_string", "") else None
+    else:
+        # Fall back to entry-level genomic fields.
+        chrom = str(entry.get("seq_region_name") or "")
+        pos = entry.get("start")
+        ref = entry.get("allele_string", "").split("/")[0] or None
+        alt = entry.get("allele_string", "").split("/")[1] if "/" in entry.get("allele_string", "") else None
 
-    if not chrom or start is None or ref is None or alt is None:
+    if not chrom or pos is None or not ref or not alt:
         return None, None, None, None
 
-    # For simple SNVs and most small indels, using 'start' as 1-based position is fine.
-    pos = int(start) + 1 if isinstance(start, int) and start == end else int(start) + 1
-
-    return chrom, pos, ref, alt
+    return chrom, int(pos), ref, alt
 
 
 # ----------------------------------------------------------------------
@@ -160,10 +161,7 @@ def _gnomad_query_variant_grch38(chrom: str, pos: int, ref: str, alt: str):
     try:
         resp = requests.get(
             GNOMAD_VARIANT_BASE,
-            params={
-                "variant": variant_id,
-                "dataset": "gnomad_r4",
-            },
+            params={"variant": variant_id, "dataset": "gnomad_r4"},
             timeout=10,
         )
         resp.raise_for_status()
@@ -193,9 +191,10 @@ def _gnomad_query_variant_grch38(chrom: str, pos: int, ref: str, alt: str):
 
 def classify_vhl_pm2(hgvs_full: str):
     """
-    VHL VCEP PM2_Supporting classifier using gnomAD v4 via:
-      - MyVariant.info (for GRCh38 mapping), then
-      - gnomAD REST API (for AC and GroupMax FAF).
+    VHL VCEP PM2_Supporting classifier using:
+
+      - Ensembl VEP REST for HGVS -> GRCh38 mapping, then
+      - gnomAD v4 REST API for AC and GroupMax FAF.
 
     PM2_Supporting is applied when:
       - The variant is absent from gnomAD v4; OR
@@ -217,13 +216,13 @@ def classify_vhl_pm2(hgvs_full: str):
 
     tx_hgvs = f"{transcript}:{cdna}"  # e.g. NM_000551.4:c.1A>T
 
-    # 2) Map to GRCh38 genomic coordinates via MyVariant.info.
-    chrom, pos, ref, alt = _get_grch38_coords_from_cdna(tx_hgvs)
+    # 2) Map to GRCh38 genomic coordinates via Ensembl VEP.
+    chrom, pos, ref, alt = _vep_map_hgvs_to_grch38(tx_hgvs)
     if not (chrom and pos and ref and alt):
         return {
             "strength": None,
             "context": (
-                f"Could not map {tx_hgvs} to GRCh38 genomic coordinates via MyVariant.info; "
+                f"Could not map {tx_hgvs} to GRCh38 genomic coordinates via Ensembl VEP; "
                 "unable to query gnomAD v4, so PM2_Supporting is not applied."
             ),
             "present_in_gnomad": False,
