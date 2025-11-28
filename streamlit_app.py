@@ -7,6 +7,7 @@ from vhl_ps2 import classify_vhl_ps2
 from vhl_pm4 import classify_vhl_pm4
 from vhl_pm1 import classify_vhl_pm1
 from vhl_pm2 import classify_vhl_pm2
+from vhl_ba1 import classify_vhl_ba1
 
 
 # ---------------- Streamlit page config ----------------
@@ -276,7 +277,7 @@ def run_classifiers(
     # PS1
     ps1_result = classify_vhl_ps1(hgvs)
 
-    # PS2 (handle family history override)
+    # PS2
     effective_is_de_novo = is_de_novo if not family_history else False
     effective_phenotype = (
         phenotype if (not family_history and phenotype is not None) else None
@@ -298,11 +299,14 @@ def run_classifiers(
     # PM1
     pm1_result = classify_vhl_pm1(hgvs)
 
-    # PM2 (gnomAD v4 via MyVariant + gnomAD GraphQL)
+    # PM2
     pm2_result = classify_vhl_pm2(hgvs)
 
     # PM4
     pm4_result = classify_vhl_pm4(hgvs)
+
+    # BA1
+    ba1_result = classify_vhl_ba1(hgvs)
 
     return {
         "PVS1": pvs1_result,
@@ -311,8 +315,8 @@ def run_classifiers(
         "PM1": pm1_result,
         "PM2": pm2_result,
         "PM4": pm4_result,
+        "BA1": ba1_result,
     }
-
 
 # ---------------- Trigger classification and display ----------------
 
@@ -331,6 +335,6 @@ if hgvs_input:
 
     st.header("Classification results")
 
-    for code in ["PVS1", "PS1", "PS2", "PM1", "PM2", "PM4"]:
+    for code in ["PVS1", "PS1", "PS2", "PM1", "PM2", "PM4", "BA1"]:
         st.subheader(code)
         st.write(results[code])
