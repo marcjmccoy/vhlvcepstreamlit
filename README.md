@@ -1,4 +1,12 @@
-## Semantically Enriched VHL/VCEP Classifier
+## One Model To Classify Them All: A Semantically Enriched VHL/VCEP Classifier
+
+## Authors
+*   **Dr. Marc McCoy, MD/MSc** - Computational Geneticist, Resident Physician
+*   **Veronica Andric**
+*   **Sarah Ridd**
+*   **Elif Tuzlali**
+*   **Helia Purnaghshband**
+*   **Dr. Raymond Kim, MD/PhD** - Principal Investigator
 
 ### Overview
 
