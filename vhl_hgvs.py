@@ -2,6 +2,7 @@
 
 import re
 
+
 def parse_vhl_hgvs(hgvs_full: str):
     """
     Shared VHL‑specific HGVS parser.
@@ -37,7 +38,7 @@ def parse_vhl_hgvs(hgvs_full: str):
 
 def format_vhl_hgvs(transcript: str, cdna: str) -> str:
     """
-    Build a display HGVS including '(VHL)' as in user input.
+    Build a display HGVS including '(VHL)' as in typical user input.
     """
     if not transcript or not cdna:
         return ""
