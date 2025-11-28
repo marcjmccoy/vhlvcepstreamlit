@@ -1,61 +1,21 @@
-# VHL/VCEP Classifier
+## VHL/VCEP Classifier
 
-VHL/VCEP Classifier is a Streamlit application that builds on the work of Dr. Raymond Kim and the ClinGen VHL Variant Curation Expert Panel (VCEP) to provide gene-wide, VHL-specific variant classification using ACMG/AMP criteria tailored for Von Hippel–Lindau disease and informed by multiplexed functional data. The app integrates VHL VCEP criteria specifications with saturation genome editing / MAVE-derived functional scores for nearly all single-nucleotide variants in VHL to support consistent, transparent variant interpretation across the gene.
+### Overview
 
-## Overview
+VHL/VCEP Classifier is an ML/AI‑powered, gene‑centric decision‑support application explicitly designed as a guideline‑forming intelligence system for Von Hippel–Lindau (VHL) variant interpretation. It operationalizes the ClinGen VHL Variant Curation Expert Panel (VCEP) gene‑ and disease‑specific ACMG/AMP specifications to deliver transparent, standards‑compliant classifications of VHL variants, combining a rules‑based implementation of VHL‑tailored criteria with multiplexed functional readouts from saturation genome editing / MAVE experiments to generate consistent, reproducible provisional classifications across the VHL coding region while exposing the full evidence stack for expert review and methods development.
 
-- Implements the VHL VCEP’s gene- and disease-specific ACMG/AMP specifications for VHL, including modified evidence codes (for example, PVS1, PS3, PS4, PM1, BS2, BS3, BS4, BP5) and unused codes, as published and versioned via ClinGen and related VHL curation manuscripts.
-- Leverages high-throughput functional data from saturation genome editing / MAVE studies of VHL to transform variant effect scores into structured evidence that can be mapped to PS3/BS3 and related functional evidence categories.
-- Aims to generate consistent provisional classifications across the entire coding region of VHL, while exposing the underlying evidence logic so expert users can review and override automated calls where appropriate.
+### Academic Rationale and Ground Truth
 
-## Scientific Background
+The classifier serves both as a reference implementation of the written VHL VCEP guidelines and as an experimental platform for studying how those guidelines behave when applied at scale. It encodes the VHL-specific ACMG/AMP framework, including adapted pathogenic and benign evidence codes, as curated and versioned in the ClinGen Criteria Specification Registry. By integrating phenotype-driven and evidence-based features such as VHL mutational hotspots, tumor-type–specific associations, gene-level population thresholds, and a disease-specific annotation protocol, the system closely mirrors contemporary VCEP expert practice rather than relying on generic ACMG/AMP rules. It generates high-fidelity “ground truth” evidence profiles and labels suitable for benchmarking LLMs, training ML/AI models, and future refinement of guideline criteria.
 
-Von Hippel–Lindau disease is a rare autosomal dominant cancer predisposition syndrome caused by pathogenic variants in VHL, with substantial phenotypic and allelic heterogeneity that complicates variant interpretation. The ClinGen VHL VCEP, led in part by Dr. Raymond Kim, has developed gene-specific ACMG/AMP specifications and a structured literature curation program to standardize VHL variant classification.
+### Functional Genomics Platform
 
-Recent saturation genome editing work has produced dense functional maps for VHL, measuring the impact of thousands of single-nucleotide variants on HIF-dependent cellular fitness and defining loss-of-function alleles with high accuracy. These VHL MAVE datasets enable systematic functional calibration of variants, providing quantitative scores that can be aligned with ACMG/AMP functional evidence strength levels and integrated alongside clinical, population, and computational data.
+The application also serves as a testbed for integrating high‑throughput functional genomics into clinical variant interpretation. It ingests quantitative data from VHL saturation genome editing / MAVE studies—capturing HIF‑dependent cellular fitness and mRNA dosage effects for thousands of single‑nucleotide variants—and converts these scores into structured functional evidence that can be mapped to PS3/BS3 at configurable strengths. This enables systematic exploration of functional evidence calibration (e.g., alternative PS3/BS3 thresholds), quantification of the impact of MAVE-derived evidence on reclassification (especially VUS resolution), and empirical assessment of how dense, gene-wide functional maps might be incorporated into future ACMG/AMP and ClinGen/VCEP recommendations.
 
-## Key Features
+### Operational Context
 
-### VHL VCEP-aware ACMG/AMP engine
+The VHL/VCEP Classifier provides genome-wide coverage for assayed VHL SNVs, including missense, synonymous, and protein-truncating variants, and flags regions with sparse or absent functional data to contextualize classifier confidence. For each variant, the interface presents (i) triggered evidence codes by category, (ii) their assigned strengths, and (iii) the resulting ACMG/AMP classification, yielding a structured, machine-readable evidence-and-label resource. This enables rigorous comparative analysis of human versus AI curation as well as academic studies of evidence use and conflict resolution.
 
-- Encodes the current VHL-specific ACMG/AMP criteria as published by the VCEP and exposed through the ClinGen Criteria Specifications Registry.
-- Supports phenotype-driven and evidence-based criteria, including curated mutational hotspots, tumor-type associations, and gene-specific benign and pathogenic thresholds where defined.
+### Provenance and Impact
 
-### MAVE / SGE functional integration
-
-- Ingests saturation genome editing / MAVE-derived functional scores for VHL variants, including quantitative measures of loss of function and mRNA dosage effects, and converts them into standardized functional evidence codes.
-- Allows configurable score thresholds for assigning PS3 (supporting/moderate/strong) or BS3 evidence, enabling comparison of different calibration schemes or cut-points as the field evolves.
-
-### Genome-wide VHL coverage
-
-- Provides classifier outputs across the entire coding sequence of VHL for all assayed single-nucleotide variants, including missense, synonymous, and protein-truncating changes where data are available.
-- Highlights regions with sparse editing or missing functional scores so users can contextualize classifier confidence.
-
-### Transparent evidence view
-
-- Presents, for each variant, the individual evidence codes triggered (functional, population, computational, segregation, phenotype, etc.), their strength, and the final ACMG/AMP classification.
-- Designed to complement manual curation workflows by providing a structured starting point that expert curators can refine.
-
-## Usage
-
-1. **Input variant**
-   - Enter a VHL variant using genomic or protein notation supported by the app (for example, HGVS-style cDNA or protein change) or select from a pre-loaded list of VHL variants if provided in the interface.
-
-2. **Review evidence**
-   - Inspect the automatically derived evidence codes, including functional scores, hotspot annotations, population data summaries, and any pre-integrated ClinGen VHL VCEP annotations.
-   - Examine the functional MAVE/SGE score and its mapping to PS3/BS3 strength levels, along with any caveats about assay scope or performance.
-
-3. **Interpret classification**
-   - View the provisional ACMG/AMP classification (e.g., Pathogenic, Likely Pathogenic, VUS, Likely Benign, Benign) generated under the VHL VCEP specifications.
-   - Optionally export or record the evidence summary for downstream use in curation systems, tumor boards, or research analyses, recognizing that this tool is decision-support only and not a stand-alone clinical reporting platform.
-
-## Installation and Development
-
-- Clone this repository and install Python dependencies (including Streamlit and the required scientific/ML packages) in a virtual environment.
-- Run the app locally with the Streamlit CLI, for example:
-
-## Intended Use and Limitations
-
-This app is intended for use by clinical geneticists, molecular pathologists, variant curators, and researchers familiar with VHL and ACMG/AMP variant interpretation. It is a research and decision-support tool that reflects current public specifications and data sources, and any classifications should be reviewed in the context of full clinical, familial, and laboratory information before use in patient care.
-
-The tool respects intellectual property and copyright of underlying publications and datasets, and users are expected to cite the original VHL VCEP specification papers and the VHL saturation genome editing/MAVE studies (e.g., Findlay et al. and subsequent VHL saturation genome editing work) when using classifier outputs in scientific or clinical work.
+This work builds directly on the efforts of the VHL early detection and annotation teams and on the leadership of Dr. Raymond Kim, Medical Director of Cancer Early Detection at Princess Margaret Cancer Centre and chair of the ClinGen VHL Variant Curation Expert Panel, whose group has defined much of the present VHL-specific ACMG/AMP framework and curated many of the genotype–phenotype resources underlying this classifier. It is targeted to clinical geneticists, molecular pathologists, variant curators, and researchers working at the interface of clinical genomics, functional genomics, and computational method development, and is explicitly positioned as a research-grade tool: all outputs must be interpreted in the context of complete clinical, familial, and laboratory information, with appropriate citation of VHL VCEP criteria publications, disease-specific annotation work, and VHL saturation genome editing/MAVE studies in scholarly and clinical use.
