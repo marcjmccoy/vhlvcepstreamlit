@@ -1,18 +1,19 @@
 """
 VHL VCEP PM2_Supporting classifier.
 
+Implements the VHL VCEP rule using gnomAD v4 on GRCh38:
+
+- PM2_Supporting can be applied for variants either absent from gnomAD or
+  with <= 0.00000156 (0.000156%) GroupMax Filtering Allele Frequency (FAF)
+  in gnomAD v4.
+- If no GroupMax FAF is calculated (e.g. single observation), PM2_Supporting
+  may also be applied.
+
 Workflow:
   1) Parse VHL transcript HGVS input, e.g. 'NM_000551.4(VHL):c.1A>T (p.Met1Leu)'.
   2) Use Ensembl VEP REST API to map NM_000551.4:c.* to GRCh38 genomic coords.
   3) Query gnomAD v4 REST API for that locus (chrom-pos-ref-alt).
-  4) Apply the VHL VCEP PM2_Supporting rule.
-
-VHL VCEP rule (GN078):
-- PM2_Supporting can be applied for variants either absent from gnomAD or
-  with <= 0.00000156 (0.000156%) GroupMax Filtering Allele Frequency (FAF)
-  in gnomAD v4.
-- If no GroupMax FAF is calculated (e.g., single observation), PM2_Supporting
-  may also be applied.
+  4) Apply the PM2_Supporting rule.
 """
 
 import re
@@ -23,10 +24,10 @@ logger = logging.getLogger(__name__)
 
 GNOMAD_PM2_MAX_FAF: float = 0.00000156  # 0.000156%
 
-# Ensembl VEP REST (GRCh38 by default when no 'content-type' override).
+# Ensembl VEP REST (GRCh38)
 VEP_HGVS_BASE = "https://rest.ensembl.org/vep/human/hgvs"
 
-# gnomAD REST “variant” endpoint (v4 / GRCh38, external API)
+# gnomAD REST variant endpoint (v4 / GRCh38)
 GNOMAD_VARIANT_BASE = "https://gnomad.broadinstitute.org/api/variant"
 
 
@@ -117,22 +118,15 @@ def _vep_map_hgvs_to_grch38(hgvs_tx: str):
     if not data:
         return None, None, None, None
 
-    # Take the first transcript consequence.
     entry = data[0]
-    colocated = (entry.get("colocated_variants") or [])
-    if colocated:
-        # Prefer colocated variant genomic fields when present.
-        var = colocated[0]
-        chrom = str(var.get("seq_region_name") or "")
-        pos = var.get("start")
-        ref = var.get("allele_string", "").split("/")[0] or None
-        alt = var.get("allele_string", "").split("/")[1] if "/" in var.get("allele_string", "") else None
+
+    chrom = str(entry.get("seq_region_name") or "")
+    pos = entry.get("start")
+    allele_string = entry.get("allele_string") or ""
+    if "/" in allele_string:
+        ref, alt = allele_string.split("/", 1)
     else:
-        # Fall back to entry-level genomic fields.
-        chrom = str(entry.get("seq_region_name") or "")
-        pos = entry.get("start")
-        ref = entry.get("allele_string", "").split("/")[0] or None
-        alt = entry.get("allele_string", "").split("/")[1] if "/" in entry.get("allele_string", "") else None
+        ref, alt = None, None
 
     if not chrom or pos is None or not ref or not alt:
         return None, None, None, None
@@ -150,7 +144,7 @@ def _gnomad_query_variant_grch38(chrom: str, pos: int, ref: str, alt: str):
     Query gnomAD REST API for a GRCh38 variant and return
     presence and GroupMax FAF (if available) from the v4 dataset.
 
-    Uses the “variantId” pattern 'chrom-pos-ref-alt', e.g. '3-10191340-C-G'.
+    Uses the “variantId” pattern 'chrom-pos-ref-alt', e.g. '3-10142007-A-T'.
 
     Returns:
         present_in_gnomad (bool)
@@ -214,7 +208,7 @@ def classify_vhl_pm2(hgvs_full: str):
             "groupmax_faf": None,
         }
 
-    tx_hgvs = f"{transcript}:{cdna}"  # e.g. NM_000551.4:c.1A>T
+    tx_hgvs = f"{transcript}:{cdna}"  # e.g. NM_000551.4:c.160A>T
 
     # 2) Map to GRCh38 genomic coordinates via Ensembl VEP.
     chrom, pos, ref, alt = _vep_map_hgvs_to_grch38(tx_hgvs)
