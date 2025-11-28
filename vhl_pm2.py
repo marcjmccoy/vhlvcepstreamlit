@@ -1,3 +1,22 @@
+"""
+VHL VCEP PM2_Supporting classifier.
+
+Implements the VHL VCEP rule using gnomAD v4 on GRCh38:
+
+- PM2_Supporting can be applied for variants either absent from gnomAD or
+  with <= 0.00000156 (0.000156%) GroupMax Filtering Allele Frequency
+  (GroupMax FAF) in gnomAD v4.
+- If no GroupMax FAF is calculated (e.g. single observation), PM2_Supporting
+  may also be applied.
+
+This module:
+  1) Parses VHL transcript HGVS input, e.g. 'NM_000551.4(VHL):c.1A>T (p.Met1Leu)'.
+  2) Uses MyVariant.info to map NM_000551.4:c.* to a GRCh38 genomic HGVS.
+  3) Queries the gnomAD v4 GraphQL API at that locus for AC and FAF95.popmax.
+  4) Applies the PM2_Supporting rule.
+"""
+
+import re
 import logging
 import requests
 
@@ -6,8 +25,45 @@ logger = logging.getLogger(__name__)
 # VHL VCEP PM2_Supporting GroupMax FAF threshold (gnomAD v4)
 GNOMAD_PM2_MAX_FAF: float = 0.00000156  # 0.000156%
 
-# gnomAD REST base for GRCh38 / v4.x
+# gnomAD GraphQL endpoint (v4 on GRCh38)
 GNOMAD_API_BASE = "https://gnomad.broadinstitute.org/api"
+
+# MyVariant.info base URL
+MYVARIANT_BASE = "https://myvariant.info/v1"
+
+
+# ----------------------------------------------------------------------
+# HGVS parsing (VHL transcript-level)
+# ----------------------------------------------------------------------
+
+
+def _parse_vhl_hgvs(hgvs_full: str):
+    """
+    Parse VHL HGVS strings like:
+      - 'NM_000551.4(VHL):c.160A>T (p.Met54Leu)'
+      - 'NM_000551.4:c.160A>T (p.Met54Leu)'
+
+    Returns:
+        transcript: e.g. 'NM_000551.4'
+        cdna:       e.g. 'c.160A>T'
+    """
+    if not isinstance(hgvs_full, str):
+        return None, None
+
+    m_tx = re.match(r"^([A-Z0-9_.]+)\(VHL\)", hgvs_full)
+    if not m_tx:
+        m_tx = re.match(r"^([A-Z0-9_.]+):", hgvs_full)
+    transcript = m_tx.group(1) if m_tx else "NM_000551.4"
+
+    m_c = re.search(r"(c\.[^ \)]+)", hgvs_full)
+    cdna = m_c.group(1) if m_c else None
+
+    return transcript, cdna
+
+
+# ----------------------------------------------------------------------
+# MyVariant: c.HGVS -> GRCh38 genomic HGVS
+# ----------------------------------------------------------------------
 
 
 def _safe_float(value):
@@ -19,16 +75,76 @@ def _safe_float(value):
         return None
 
 
+def _safe_int(value, default=0):
+    try:
+        if value is None:
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _parse_genomic_hgvs_grch38(hgvs_g: str):
+    """
+    Parse GRCh38 genomic HGVS like 'chr3:g.10191340A>T' into
+    chrom='3', pos=10191340, ref='A', alt='T'.
+    """
+    m = re.match(r"^chr(\w+):g\.(\d+)([ACGT])>([ACGT])$", hgvs_g)
+    if not m:
+        return None, None, None, None
+    chrom = m.group(1)
+    pos = int(m.group(2))
+    ref = m.group(3)
+    alt = m.group(4)
+    return chrom, pos, ref, alt
+
+
+def _get_grch38_coords_from_cdna(hgvs_tx: str):
+    """
+    Use MyVariant.info to map a transcript HGVS (NM_000551.4:c.*)
+    to a GRCh38 genomic HGVS and return chrom, pos, ref, alt.
+
+    Returns:
+        chrom, pos, ref, alt or (None, None, None, None) if mapping fails.
+    """
+    try:
+        resp = requests.get(
+            f"{MYVARIANT_BASE}/query",
+            params={
+                "q": hgvs_tx,
+                "fields": "hg38",
+                "assembly": "hg38",
+                "size": 1,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json() or {}
+    except Exception as exc:
+        logger.warning("MyVariant hg38 mapping failed for %s: %s", hgvs_tx, exc)
+        return None, None, None, None
+
+    hits = data.get("hits") or []
+    if not hits:
+        return None, None, None, None
+
+    hg38_block = hits[0].get("hg38") or {}
+    hgvs_g = hg38_block.get("hgvs")
+    if not hgvs_g:
+        return None, None, None, None
+
+    return _parse_genomic_hgvs_grch38(hgvs_g)
+
+
+# ----------------------------------------------------------------------
+# gnomAD v4 (GraphQL) query by GRCh38 coordinates
+# ----------------------------------------------------------------------
+
+
 def _gnomad_query_variant_grch38(chrom: str, pos: int, ref: str, alt: str):
     """
     Query gnomAD GraphQL API for a GRCh38 variant and return
     presence and GroupMax FAF (if available) from the v4 dataset.
-
-    Args:
-        chrom: chromosome string, e.g. '3'
-        pos:   1-based genomic position (int)
-        ref:   reference allele
-        alt:   alternate allele
 
     Returns:
         present_in_gnomad (bool)
@@ -49,7 +165,7 @@ def _gnomad_query_variant_grch38(chrom: str, pos: int, ref: str, alt: str):
     """
 
     variables = {
-        "chrom": chrom,
+        "chrom": str(chrom),
         "pos": int(pos),
         "ref": ref,
         "alt": alt,
@@ -64,8 +180,9 @@ def _gnomad_query_variant_grch38(chrom: str, pos: int, ref: str, alt: str):
         resp.raise_for_status()
         data = resp.json() or {}
     except Exception as exc:
-        logger.warning("gnomAD API error for %s:%s:%s>%s: %s",
-                       chrom, pos, ref, alt, exc)
+        logger.warning(
+            "gnomAD API error for %s:%s:%s>%s: %s", chrom, pos, ref, alt, exc
+        )
         return False, None
 
     variant = (data.get("data") or {}).get("variant")
@@ -74,7 +191,7 @@ def _gnomad_query_variant_grch38(chrom: str, pos: int, ref: str, alt: str):
         return False, None
 
     genome = variant.get("genome") or {}
-    ac = genome.get("ac") or 0
+    ac = _safe_int(genome.get("ac"), default=0)
     present = ac > 0
 
     faf_block = genome.get("faf95") or {}
@@ -83,58 +200,62 @@ def _gnomad_query_variant_grch38(chrom: str, pos: int, ref: str, alt: str):
     return present, faf_popmax
 
 
-def classify_vhl_pm2(
-    hgvs_full: str,
-    chrom: str | None = None,
-    pos: int | None = None,
-    ref: str | None = None,
-    alt: str | None = None,
-):
+# ----------------------------------------------------------------------
+# Main PM2 classifier
+# ----------------------------------------------------------------------
+
+
+def classify_vhl_pm2(hgvs_full: str):
     """
-    VHL VCEP PM2_Supporting classifier using gnomAD v4 via the gnomAD GraphQL API.
+    VHL VCEP PM2_Supporting classifier using gnomAD v4 via:
+      - MyVariant.info (for GRCh38 mapping), then
+      - gnomAD GraphQL API (for AC and GroupMax FAF).
 
-    The VCEP rule:
-      - Apply PM2_Supporting if the variant is ABSENT from gnomAD v4; OR
-      - If GroupMax Filtering Allele Frequency (FAF) ≤ 1.56×10⁻⁶; OR
-      - If the variant is present but no GroupMax FAF is calculated.
-
-    To honour this exactly, this function expects a GRCh38 genomic
-    representation (chrom, pos, ref, alt) for querying gnomAD v4.
-    `hgvs_full` is used only for explanatory context.
-
-    Args:
-        hgvs_full:
-            VHL HGVS for display (e.g. 'NM_000551.4(VHL):c.1A>T').
-        chrom, pos, ref, alt:
-            GRCh38 genomic representation matching gnomAD v4, e.g.
-            chrom='3', pos=10191340, ref='A', alt='T'.
-
-    Returns:
-        dict with keys:
-            - strength: "PM2_Supporting" or None
-            - context: explanation string
-            - present_in_gnomad: bool
-            - groupmax_faf: float or None
+    PM2_Supporting is applied when:
+      - The variant is absent from gnomAD v4; OR
+      - GroupMax FAF ≤ GNOMAD_PM2_MAX_FAF; OR
+      - The variant is present but no GroupMax FAF is calculated.
     """
-    if not (chrom and pos and ref and alt):
+    # 1) Parse transcript and cDNA from VHL HGVS.
+    transcript, cdna = _parse_vhl_hgvs(hgvs_full)
+    if transcript is None or cdna is None:
         return {
             "strength": None,
             "context": (
-                "No GRCh38 genomic coordinates were provided; cannot query gnomAD v4 "
-                "for GroupMax FAF, so PM2_Supporting is not applied."
+                "Could not parse transcript and cDNA HGVS from input; "
+                "PM2_Supporting not applied."
             ),
             "present_in_gnomad": False,
             "groupmax_faf": None,
         }
 
+    tx_hgvs = f"{transcript}:{cdna}"  # e.g. NM_000551.4:c.1A>T
+
+    # 2) Map to GRCh38 genomic coordinates via MyVariant.info.
+    chrom, pos, ref, alt = _get_grch38_coords_from_cdna(tx_hgvs)
+    if not (chrom and pos and ref and alt):
+        return {
+            "strength": None,
+            "context": (
+                f"Could not map {tx_hgvs} to GRCh38 genomic coordinates via MyVariant.info; "
+                "unable to query gnomAD v4, so PM2_Supporting is not applied."
+            ),
+            "present_in_gnomad": False,
+            "groupmax_faf": None,
+        }
+
+    # 3) Query gnomAD v4 for presence and GroupMax FAF.
     present, faf = _gnomad_query_variant_grch38(chrom, pos, ref, alt)
+
+    # 4) Apply the VHL VCEP PM2_Supporting rule.
 
     # 1) Absent from gnomAD v4.
     if not present:
         return {
             "strength": "PM2_Supporting",
             "context": (
-                f"{hgvs_full} is absent from gnomAD v4 (no alternate alleles observed), "
+                f"{hgvs_full} is absent from gnomAD v4 "
+                f"(no alternate alleles observed at chr{chrom}:g.{pos}{ref}>{alt}), "
                 "meeting the PM2_Supporting population criterion."
             ),
             "present_in_gnomad": False,
@@ -146,8 +267,9 @@ def classify_vhl_pm2(
         return {
             "strength": "PM2_Supporting",
             "context": (
-                f"{hgvs_full} is present in gnomAD v4 with GroupMax FAF={faf:.3e}, "
-                "which is ≤1.56×10⁻⁶, so PM2_Supporting is applicable."
+                f"{hgvs_full} is present in gnomAD v4 at chr{chrom}:g.{pos}{ref}>{alt} "
+                f"with GroupMax FAF={faf:.3e}, which is ≤1.56×10⁻⁶, so "
+                "PM2_Supporting is applicable."
             ),
             "present_in_gnomad": True,
             "groupmax_faf": faf,
@@ -158,9 +280,9 @@ def classify_vhl_pm2(
         return {
             "strength": "PM2_Supporting",
             "context": (
-                f"{hgvs_full} is observed in gnomAD v4 but lacks a GroupMax Filtering "
-                "Allele Frequency estimate (e.g. single observation); this still "
-                "qualifies for PM2_Supporting."
+                f"{hgvs_full} is observed in gnomAD v4 at chr{chrom}:g.{pos}{ref}>{alt} "
+                "but lacks a GroupMax Filtering Allele Frequency estimate "
+                "(e.g. single observation); this still qualifies for PM2_Supporting."
             ),
             "present_in_gnomad": True,
             "groupmax_faf": None,
@@ -170,7 +292,8 @@ def classify_vhl_pm2(
     return {
         "strength": None,
         "context": (
-            f"{hgvs_full} has GroupMax FAF={faf:.3e} in gnomAD v4, which exceeds the "
+            f"{hgvs_full} has GroupMax FAF={faf:.3e} in gnomAD v4 at "
+            f"chr{chrom}:g.{pos}{ref}>{alt}, which exceeds the "
             "PM2_Supporting cutoff of 1.56×10⁻⁶; PM2_Supporting not applied."
         ),
         "present_in_gnomad": True,
