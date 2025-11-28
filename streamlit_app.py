@@ -58,15 +58,12 @@ st.sidebar.markdown(
 ### About VHL VCEP
 
 The **VHL Variant Curation Expert Panel (VCEP)** is part of ClinGen’s effort to
-provide expert-level clinical validity for variants in the *VHL* gene.[web:40]
-The committee is chaired by **Dr. Raymond Kim**, whose work at Princess Margaret
+provide expert-level clinical validity for variants in the *VHL* gene. The committee is chaired by **Dr. Raymond Kim**, whose work at Princess Margaret
 Cancer Centre and the Early Cancer Detection Program focuses on hereditary
-cancer genetics and variant interpretation.[web:40]
+cancer genetics and variant interpretation.
 
-- 📄 VHL VCEP protocol paper (Hypothes.is-based annotation):  
-  https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/[web:40]
-- 📄 ClinGen VHL VCEP ACMG/AMP specifications (GN078):  
-  https://cspec.genome.network/cspec/ui/svi/doc/GN078[web:7]
+- 📄 [VHL VCEP Hypothes.is-based protocol paper annotation](https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/)
+- 📄 [ClinGen VHL VCEP ACMG/AMP specifications](https://cspec.genome.network/cspec/ui/svi/doc/GN078)
 """
 )
 

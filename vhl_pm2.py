@@ -1,18 +1,22 @@
+"""
+VHL VCEP PM2_Supporting classifier (gnomAD v4 via ClinGen LDH).
+
+Implements GN078 PM2_Supporting using GroupMax Filtering Allele Frequency
+(FAF) from gnomAD v4 accessed through ClinGen LDH.
+"""
+
 import requests
+from vhl_hgvs import parse_vhl_hgvs  # shared parser you define once
 
-
-# VHL VCEP PM2_Supporting GroupMax FAF threshold (gnomAD v4).[web:7][web:69]
+# VHL VCEP PM2_Supporting GroupMax FAF threshold (gnomAD v4)
 GNOMAD_PM2_MAX_FAF: float = 0.00000156  # 0.000156%
 
-
-# ClinGen LDH base URL (front end to gnomAD v4).[web:70]
+# ClinGen LDH base URL (front end to gnomAD v4)
 CLINGEN_LDH_BASE: str = "https://ldh.clinicalgenome.org/ldh/"
 
 
 def _safe_float(value):
-    """
-    Convert value to float, returning None if conversion fails.
-    """
+    """Convert value to float, returning None if conversion fails."""
     try:
         if value is None:
             return None
@@ -22,9 +26,7 @@ def _safe_float(value):
 
 
 def _safe_int(value, default=0):
-    """
-    Convert value to int, returning `default` if conversion fails.
-    """
+    """Convert value to int, returning `default` if conversion fails."""
     try:
         if value is None:
             return default
@@ -56,7 +58,7 @@ def _query_clingen_gnomad_v4(cdna_hgvs: str, transcript: str = "NM_000551.4"):
 
     params = {
         "q": full_hgvs,
-        "dataset": "gnomAD_v4",  # dataset key used in LDH for gnomAD v4.[web:70]
+        "dataset": "gnomAD_v4",
         "rows": 1,
     }
 
@@ -78,7 +80,7 @@ def _query_clingen_gnomad_v4(cdna_hgvs: str, transcript: str = "NM_000551.4"):
 
     doc = docs[0]
 
-    # gnomAD/LDH can expose GroupMax FAF with slightly different field names.[web:69][web:74]
+    # GroupMax FAF can appear under slightly different field names in LDH/gnomAD.
     faf_raw = (
         doc.get("jointGrpMaxFAF95")
         or doc.get("grpmaxFAF")
@@ -87,7 +89,7 @@ def _query_clingen_gnomad_v4(cdna_hgvs: str, transcript: str = "NM_000551.4"):
     )
     faf = _safe_float(faf_raw)
 
-    # Allele count can also be named differently.
+    # Allele count field variants.
     ac_raw = doc.get("AC") or doc.get("allele_count") or doc.get("ac")
     ac = _safe_int(ac_raw, default=0)
 
@@ -99,12 +101,10 @@ def classify_vhl_pm2(hgvs_full: str):
     """
     VHL VCEP PM2_Supporting classifier using gnomAD v4 via ClinGen LDH.
 
-    Criteria (Supporting strength) per VHL VCEP GN078:[web:7]
-      - Variant is absent from gnomAD; OR
-      - Variant has GroupMax Filtering Allele Frequency (gnomAD v4)
-        ≤ 0.00000156 (0.000156%); OR
-      - Variant is present but no GroupMax FAF is calculated
-        (e.g., single observation).
+    PM2_Supporting is applied when:
+      - The variant is absent from gnomAD v4; OR
+      - The variant has GroupMax Filtering Allele Frequency ≤ GNOMAD_PM2_MAX_FAF; OR
+      - The variant is present but has no GroupMax FAF calculated (e.g., a single observation).
 
     Args:
         hgvs_full:
@@ -117,9 +117,7 @@ def classify_vhl_pm2(hgvs_full: str):
             - present_in_gnomad: bool
             - groupmax_faf: float or None
     """
-    # _parse_vhl_hgvs should be provided elsewhere in your code base.
-    # It must return (transcript, cdna_hgvs, protein_hgvs or None).
-    transcript, cdna, _ = _parse_vhl_hgvs(hgvs_full)
+    transcript, cdna, _ = parse_vhl_hgvs(hgvs_full)
 
     if cdna is None or transcript is None:
         return {
@@ -140,8 +138,7 @@ def classify_vhl_pm2(hgvs_full: str):
             "strength": "PM2_Supporting",
             "context": (
                 f"{transcript}:{cdna} is absent from gnomAD v4 (no alternate "
-                "alleles observed), meeting the VHL VCEP PM2_Supporting "
-                "population criterion."
+                "alleles observed), meeting the PM2_Supporting population criterion."
             ),
             "present_in_gnomad": False,
             "groupmax_faf": None,
@@ -154,7 +151,7 @@ def classify_vhl_pm2(hgvs_full: str):
             "context": (
                 f"{transcript}:{cdna} is present in gnomAD v4 with "
                 f"GroupMax FAF={faf:.3e}, which is ≤1.56×10⁻⁶, so "
-                "PM2_Supporting is applicable per VHL VCEP."
+                "PM2_Supporting is applicable."
             ),
             "present_in_gnomad": True,
             "groupmax_faf": faf,
@@ -166,8 +163,8 @@ def classify_vhl_pm2(hgvs_full: str):
             "strength": "PM2_Supporting",
             "context": (
                 f"{transcript}:{cdna} is observed in gnomAD v4 but lacks a "
-                "GroupMax FAF estimate (likely a single‑allele site); under "
-                "VHL VCEP this still qualifies for PM2_Supporting."
+                "GroupMax FAF estimate (likely a single‑allele site); this still "
+                "qualifies for PM2_Supporting."
             ),
             "present_in_gnomad": True,
             "groupmax_faf": None,
@@ -178,7 +175,7 @@ def classify_vhl_pm2(hgvs_full: str):
         "strength": None,
         "context": (
             f"{transcript}:{cdna} has GroupMax FAF={faf:.3e} in gnomAD v4, "
-            "which exceeds the VHL VCEP PM2_Supporting cutoff of 1.56×10⁻⁶; "
+            "which exceeds the PM2_Supporting cutoff of 1.56×10⁻⁶; "
             "PM2_Supporting not applied."
         ),
         "present_in_gnomad": True,
