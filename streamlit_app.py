@@ -1,20 +1,29 @@
+import requests
 import streamlit as st
 import pandas as pd
-
 from vhl_pvs1 import classify_vhl_pvs1
 from vhl_ps1 import classify_vhl_ps1
 from vhl_ps2 import classify_vhl_ps2
 from vhl_pm4 import classify_vhl_pm4
+from vhl_pm1 import classify_vhl_pm1
+from vhl_pm2 import classify_vhl_pm2
 
 
-# ---------------- Page config ----------------
+# ---------------- Constants ----------------
+GNOMAD_PM2_MAX_FAF = 0.00000156  # 0.000156%, per VHL VCEP PM2_Supporting.
+CLINGEN_LDH_BASE = "https://ldh.clinicalgenome.org/ldh/"  # ClinGen LDH front end.
+
+# ---------------- Streamlit page config ----------------
+
 st.set_page_config(
     page_title="VHL/VCEP Classifier",
     page_icon="🧬",
     layout="wide",
 )
 
+
 # ---------------- CSS for wrapped tables ----------------
+
 st.markdown(
     """
     <style>
@@ -43,24 +52,27 @@ def show_wrapped_table(df: pd.DataFrame) -> None:
 
 
 # ---------------- Sidebar: About ----------------
+
 st.sidebar.markdown(
     """
 ### About VHL VCEP
 
-The **VHL Variant Curation Expert Panel (VCEP)** is part of ClinGen’s effort to provide
-expert-level clinical validity for variants in the *VHL* gene. The committee is chaired
-by **Dr. Raymond Kim**, whose work at Princess Margaret Cancer Centre and the Early Cancer
-Detection Program focuses on hereditary cancer genetics and variant interpretation. His team
-has developed a disease-specific annotation protocol using Hypothes.is to enable community
-curation of VHL variants and accelerate resolution of variants of uncertain significance.
+The **VHL Variant Curation Expert Panel (VCEP)** is part of ClinGen’s effort to
+provide expert-level clinical validity for variants in the *VHL* gene.[web:40]
+The committee is chaired by **Dr. Raymond Kim**, whose work at Princess Margaret
+Cancer Centre and the Early Cancer Detection Program focuses on hereditary
+cancer genetics and variant interpretation.[web:40]
 
-- 📄 Read more in the [VHL VCEP protocol paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/)
-- 📄 Reference the [ClinGen VHL Expert Panel Guideline](https://cspec.genome.network/cspec/ui/svi/doc/GN078)
+- 📄 VHL VCEP protocol paper (Hypothes.is-based annotation):  
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC9825735/[web:40]
+- 📄 ClinGen VHL VCEP ACMG/AMP specifications (GN078):  
+  https://cspec.genome.network/cspec/ui/svi/doc/GN078[web:7]
 """
 )
 
 
-# ---------------- Helper: Example variants table ----------------
+# ---------------- Example variants ----------------
+
 def build_example_variants_df() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -88,35 +100,43 @@ def build_example_variants_df() -> pd.DataFrame:
                 "Three-base in-frame deletion removing one conserved residue.",
                 "In-frame tandem duplication adding two residues without a frameshift.",
                 "Nonsense variant introducing a premature stop in the central part of VHL.",
-                "in-frame deletion that removes codon 63, which lies within the critical beta domain (AA 63–155) of pVHL",
+                "In-frame deletion that removes codon 63, within the beta domain (AA 63–155) of pVHL.",
             ],
         }
     )
 
 
 # ---------------- Main title and intro ----------------
+
 st.title("VHL/VCEP Classifier (v2.0 TEST) 🧬")
 
 st.markdown(
     """
-Enter a variant in HGVS (cDNA) notation to predict **PVS1**, **PS1**, and **PS2** strength
-according to VHL VCEP guidelines. Classifiers for additional criteria are under development.
-The context fields in the output explain why each strength label was applied. Refer to the
-original [ACMG/AMP Variant Interpretation Guidelines for VHL Version 1.1.0](https://cspec.genome.network/cspec/ui/svi/doc/GN078)
+Enter a variant in HGVS notation to predict **PVS1**, **PS1**, **PS2**, **PM1**,
+**PM2**, and **PM4** strengths according to the VHL VCEP specifications.[web:7][web:37]
+The context fields in the outputs explain why each strength label was applied.
 
-**Note:** PM3, PP2, PP4, PP5, BP1, BP6 are *not recommended* for use by the ClinGen SVI VCEP Review Committee for VHL.
+Reference:  
+[ACMG/AMP Variant Interpretation Guidelines for VHL, Version 1.1.0][web:7]  
+https://cspec.genome.network/cspec/ui/svi/doc/GN078
+
+**Note:** PM3, PP2, PP4, PP5, BP1, BP6 are *not recommended* for use by the
+ClinGen SVI VCEP Review Committee for VHL.[web:7][web:37]
 """
 )
 
-# ---------------- Example variants (above input) ----------------
 st.markdown("### Example variants")
 example_variants = build_example_variants_df()
 show_wrapped_table(example_variants)
 
+
 # ---------------- HGVS input ----------------
+
 hgvs_input = st.text_input("HGVS c. Notation (see examples above)", "")
 
+
 # ---------------- PVS1 / PS1 options ----------------
+
 with st.expander("PVS1 / PS1 Options"):
     st.markdown("#### PVS1 Options")
 
@@ -140,17 +160,19 @@ with st.expander("PVS1 / PS1 Options"):
         index=0,
     )
 
+
 # ---------------- PS2 (De novo) options ----------------
+
 with st.expander("PS2 (De Novo) Options"):
     st.markdown(
         """
 **Scoring clarity for PS2 (de novo):**
 
-- If **any family history** of VHL disease is present, PS2 evidence cannot be assigned.
+- If **any family history** of VHL disease is present, PS2 evidence cannot be assigned.[web:7]
 - When there is no family history, PS2 strength depends on:
   - Confirmed de novo status (maternity and paternity tested).
   - Phenotype category.
-  - Completeness and negativity of the relevant gene panel.
+  - Completeness and negativity of the relevant gene panel (per VHL VCEP).[web:7]
 """
     )
 
@@ -174,14 +196,14 @@ with st.expander("PS2 (De Novo) Options"):
     else:
         st.markdown(
             """
-To achieve **Moderate (1 point)** PS2 evidence:
+To achieve **Moderate (1 point)** PS2 evidence, per VHL VCEP:[web:7]
 
 1. Confirmed de novo status (both maternity and paternity testing performed).
-2. For *Highly specific* or *Consistent* phenotypes, all required genes must be negative
-   on panel testing.
+2. For *Highly specific* or *Consistent* phenotypes, all required genes must be
+   negative on panel testing.
 
-If the panel is incomplete or not performed, only **Supporting (0.5 points)** PS2
-evidence can be assigned, even with confirmed de novo status.
+If the panel is incomplete or not performed, only **Supporting (0.5 points)**
+PS2 evidence can be assigned, even with confirmed de novo status.[web:7]
 """
         )
 
@@ -211,11 +233,11 @@ evidence can be assigned, even with confirmed de novo status.
 **Panel results (should be negative to maximize evidence):**
 
 - For VHL2c (pheochromocytoma-only): all of
-  [MAX, NF1, RET, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127, VHL] should be negative.
+  [MAX, NF1, RET, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127, VHL] should be negative.[web:7]
 - For RCC+Pheo: all of
-  [MAX, FH, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127] should be negative.
+  [MAX, FH, SDHA, SDHB, SDHC, SDHD, SDHAF2, TMEM127] should be negative.[web:7]
 
-If these panels are incomplete or unknown, only PS2_Supporting can be assigned.
+If these panels are incomplete or unknown, only PS2_Supporting can be assigned.[web:7]
 """
         )
 
@@ -243,7 +265,8 @@ If these panels are incomplete or unknown, only PS2_Supporting can be assigned.
                 panel_neg[gene] = "neg" if checked else None
 
 
-# ---------------- Run classifiers ----------------
+# ---------------- Classifier runner ----------------
+
 def run_classifiers(
     hgvs: str,
     exon_skipping: bool,
@@ -269,7 +292,7 @@ def run_classifiers(
     # PS1
     ps1_result = classify_vhl_ps1(hgvs)
 
-    # PS2
+    # PS2 (handle family history override)
     effective_is_de_novo = is_de_novo if not family_history else False
     effective_phenotype = (
         phenotype if (not family_history and phenotype is not None) else None
@@ -288,16 +311,29 @@ def run_classifiers(
         family_history=family_history,
     )
 
-    # PM4
-    pm4_result = classify_vhl_pm4(
-        hgvs
-    )
+    # PM1 (functional/critical domain enrichment per VHL VCEP).[web:7][web:37]
+    pm1_result = classify_vhl_pm1(hgvs)
 
-    return pvs1_result, ps1_result, ps2_result, pm4_result
+    # PM2 (rarity in gnomAD v4 via ClinGen LDH).
+    pm2_result = classify_vhl_pm2(hgvs)
 
-# ---------------- Trigger classification ----------------
+    # PM4 (protein-length changing variants).[web:7]
+    pm4_result = classify_vhl_pm4(hgvs)
+
+    return {
+        "PVS1": pvs1_result,
+        "PS1": ps1_result,
+        "PS2": ps2_result,
+        "PM1": pm1_result,
+        "PM2": pm2_result,
+        "PM4": pm4_result,
+    }
+
+
+# ---------------- Trigger classification and display ----------------
+
 if hgvs_input:
-    pvs1_result, ps1_result, ps2_result, pm4_result = run_classifiers(
+    results = run_classifiers(
         hgvs_input,
         exon_skipping=exon_skipping,
         cryptic_disrupts_rf=cryptic_disrupts_rf,
@@ -311,14 +347,6 @@ if hgvs_input:
 
     st.header("Classification results")
 
-    st.subheader("PVS1")
-    st.write(pvs1_result)
-
-    st.subheader("PS1")
-    st.write(ps1_result)
-
-    st.subheader("PS2")
-    st.write(ps2_result)
-
-    st.subheader("PM4")
-    st.write(pm4_result)
+    for code in ["PVS1", "PS1", "PS2", "PM1", "PM2", "PM4"]:
+        st.subheader(code)
+        st.write(results[code])
