@@ -8,7 +8,7 @@ from vhl_pm4 import classify_vhl_pm4
 from vhl_pm1 import classify_vhl_pm1
 from vhl_pm2 import classify_vhl_pm2
 from vhl_ba1 import classify_vhl_ba1
-
+from vhl_bs1 import classify_vhl_bs1
 
 # ---------------- Streamlit page config ----------------
 
@@ -308,6 +308,9 @@ def run_classifiers(
     # BA1
     ba1_result = classify_vhl_ba1(hgvs)
 
+    # BS1
+    bs1_result = classify_vhl_bs1(hgvs)
+
     return {
         "PVS1": pvs1_result,
         "PS1": ps1_result,
@@ -316,6 +319,7 @@ def run_classifiers(
         "PM2": pm2_result,
         "PM4": pm4_result,
         "BA1": ba1_result,
+        "BS1": bs1_result,
     }
 
 # ---------------- Trigger classification and display ----------------
@@ -335,6 +339,6 @@ if hgvs_input:
 
     st.header("Classification results")
 
-    for code in ["PVS1", "PS1", "PS2", "PM1", "PM2", "PM4", "BA1"]:
+    for code in ["PVS1", "PS1", "PS2", "PM1", "PM2", "PM4", "BA1", "BS1"]:
         st.subheader(code)
         st.write(results[code])
