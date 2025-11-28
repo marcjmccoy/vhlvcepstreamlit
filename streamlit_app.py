@@ -87,18 +87,6 @@ def build_example_variants_df() -> pd.DataFrame:
                 "In-frame tandem duplication adding two residues without a frameshift.",
                 "Nonsense variant introducing a premature stop in the central part of VHL.",
             ],
-            "Relevance": [
-                "Tests PVS1 very strong handling for canonical ±1 splice variants and avoidance of double-counting PP3 in line with GN078.",
-                "Tests PVS1 very strong assignment for clear multi-exon loss-of-function deletions.",
-                "Tests nuanced, downgraded PVS1 strengths and appropriate use of PP3/BP4 for non-canonical splice variants.",
-                "Tests special PVS1 handling and possible downgrading for start-loss variants where alternative starts may preserve function.",
-                "Tests PS1 when the same amino-acid change is already pathogenic and PM1 for location in a critical domain.",
-                "Tests benign/BP-style logic such as BP4/BP7 when splicing is predicted to be unaffected and ensures PVS1 is not applied.",
-                "Tests PVS1 strength decisions near NMD boundaries and handling of late truncating variants.",
-                "Tests PM4 and domain-based PM1 logic while ensuring PVS1 is not used for in-frame events.",
-                "Tests PM4/domain logic and correct distinction from exon-level duplications that may follow the PVS1 decision tree.",
-                "Tests PVS1 very strong for classic truncating variants and can be combined with de novo evidence for PS2 scoring.",
-            ],
         }
     )
 

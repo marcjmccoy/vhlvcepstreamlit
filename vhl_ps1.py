@@ -73,7 +73,7 @@ def classify_vhl_ps1(test_variant):
         return {
             'strength': None,
             'context': (
-                f"Variant ({protein_change}) his no matching VHL VCEP/ClinGen pathogenic variant in the reference list; therefore PS1 does not apply."
+                f"Variant ({protein_change}) has no matching VHL VCEP/ClinGen pathogenic variant in the reference list; therefore PS1 does not apply."
             )
         }
 

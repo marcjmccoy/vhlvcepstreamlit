@@ -2,9 +2,9 @@ import re
 
 # Exon boundaries for NM_000551.4 (VHL); adjust as needed
 VHL_EXON_BOUNDS = [
-    (1, 118),    # Exon 1: c.1 - c.118
-    (119, 340),  # Exon 2: c.119 - c.340
-    (341, 639)   # Exon 3: c.341 - c.639
+    (1, 340),    # Exon 1: c.1 - c.340
+    (341, 463),  # Exon 2: c.341 - c.463
+    (464, 642)   # Exon 3: c.464 - c.642
 ]
 
 CRITICAL_DOMAINS = [
