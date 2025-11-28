@@ -1,31 +1,33 @@
 """
 VHL VCEP PM1 / PM1_Supporting classifier.
 
-Implements:
-  - PM1 (Moderate) for:
-      * Germline missense hotspot codons;
-      * Somatic hotspot codons with ≥10 tumors at that AA in cancerhotspots.org;
-      * Missense variants in the critical pVHL domain 63–192 AA.
-  - PM1_Supporting for:
-      * Somatic hotspot codons with 1–9 tumors at that AA in cancerhotspots.org.
+PM1 (Moderate):
+  - Putative missense variants that are known germline hotspots; and/or
+  - Located in a key pVHL functional domain (63–192 AA); and/or
+  - Somatic hotspots with ≥10 instances for the same AA in cancerhotspots.org,
+    provided the codon is not a germline hotspot.
+
+PM1_Supporting:
+  - Putative missense variants seen in somatic databases, with 1–9 instances
+    for the same AA in cancerhotspots.org (and not germline hotspots).
 
 Only simple missense substitutions are eligible.
 """
 
 import re
+
 from vhl_hgvs import parse_vhl_hgvs
+
 
 # Germline missense hotspot codons (Stebbins + Chiorean; keep synced to VCEP table).
 GERMLINE_HOTSPOT_POSITIONS = {
-    # Stebbins germline: R167, C162, L178, Y98, N78, P86
-    167, 162, 178, 98, 78, 86,
-    # Additional Chiorean germline positions (update as needed)
+    167, 162, 178, 98, 78, 86,   # Stebbins
     65, 76, 80, 88, 96, 112, 117,
     161, 170, 176,
 }
 
 # Somatic hotspot codons from cancerhotspots.org / Walsh (not treated as
-# somatic if also in GERMLINE_HOTSPOT_POSITIONS).
+# somatic if also in GERMLINE_HOTSPOT_POSITIONS). Values are tumor counts.
 SOMATIC_HOTSPOT_COUNTS = {
     65: 5,
     68: 12,
@@ -44,7 +46,7 @@ SOMATIC_HOTSPOT_COUNTS = {
     169: 10,
 }
 
-# Critical pVHL functional domain used for PM1: 63–192 AA.
+# Critical pVHL functional domain for PM1: 63–192 AA.
 PM1_FUNCTIONAL_DOMAINS = [(63, 192)]
 
 
