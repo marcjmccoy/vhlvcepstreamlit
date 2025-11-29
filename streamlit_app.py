@@ -82,6 +82,7 @@ def build_example_variants_df() -> pd.DataFrame:
                 "NM_000551.4(VHL):c.190_195dup (p.Lys64_Leu65dup)",
                 "NM_000551.4(VHL):c.263G>A (p.Trp88Ter)",
                 "NM_000551.4(VHL):c.189_191del",
+                "NM_000551.4(VHL):c.293A>G (p.Tyr98Cys)",
             ],
             "Rationale": [
                 "Canonical +1 donor splice change expected to abolish splicing in a loss-of-function VHL gene.",
@@ -95,6 +96,7 @@ def build_example_variants_df() -> pd.DataFrame:
                 "In-frame tandem duplication adding two residues without a frameshift.",
                 "Nonsense variant introducing a premature stop in the central part of VHL.",
                 "In-frame deletion that removes codon 63, within the beta domain (AA 63–155) of pVHL.",
+                "Missense variant substituting a highly conserved tyrosine with cysteine at residue 98 within VCEP curated functional hotspot domain"
             ],
         }
     )
